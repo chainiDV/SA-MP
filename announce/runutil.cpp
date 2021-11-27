@@ -85,7 +85,7 @@ void Util_strupr(char *string)
 int Util_wildcmp(char *wild, char *string)
 {
 	char *cp, *mp;
-	
+
 	while((*string) && (*wild != '*'))
 	{
 		if((*wild != *string) && (*wild != '?'))
@@ -95,7 +95,7 @@ int Util_wildcmp(char *wild, char *string)
 		wild++;
 		string++;
 	}
-		
+
 	while (*string)
 	{
 		if (*wild == '*')
@@ -118,7 +118,7 @@ int Util_wildcmp(char *wild, char *string)
 			string = cp++;
 		}
 	}
-		
+
 	while (*wild == '*')
 	{
 		wild++;
@@ -204,11 +204,11 @@ char * Util_itoa(int v, char *s, int r)
 
 //----------------------------------------------------
 
-const char * Base64Encoding = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+char * Base64Encoding = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
 void Util_Base64Encode( char *cpInput, char *cpOutput )
 {
-int nIdx[ 4 ];  
+int nIdx[ 4 ];
 while ( '\0' != *cpInput )
 {
   nIdx[0] = ((*cpInput) & 0xFC)>>2;
@@ -248,10 +248,10 @@ return;
 
 //----------------------------------------------------
 
-void K_EncodeString(char *szInput, char *szOutput)
+/*void K_EncodeString(char* szInput, char* szOutput)
 {
 	char b;
-#ifdef WIN32
+
 	while(*szInput) {
 		b = *szInput;
 		_asm mov bl, b
@@ -261,17 +261,16 @@ void K_EncodeString(char *szInput, char *szOutput)
 		szInput++;
 		szOutput++;
 	}
-#endif
 	*szOutput = 0;
-}
+}*/
 
 //----------------------------------------------------
 
-char * K_DecodeString(char *szInput)
+/*char* K_DecodeString(char* szInput)
 {
 	char b;
 	char *st = szInput;
-#ifdef WIN32
+    
 	while(*szInput) {
 		b = *szInput;
 		_asm mov bl, b
@@ -280,9 +279,9 @@ char * K_DecodeString(char *szInput)
 		*szInput = b;
 		szInput++;
 	}
-#endif
+
 	return st;
-}
+}*/
 
 //----------------------------------------------------
 

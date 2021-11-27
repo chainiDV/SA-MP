@@ -33,7 +33,7 @@
 
 //----------------------------------------------------
 
-#define USER_AGENT  "SAMP/0.221"
+#define USER_AGENT  "SAMP/0.30"
 #define GET_FORMAT  "GET %s HTTP/1.0\r\nAccept: */*\r\nUser-Agent: %s\r\nReferer: http://%s\r\nHost: %s\r\n\r\n"
 #define POST_FORMAT "POST %s HTTP/1.0\r\nAccept: */*\r\nUser-Agent: %s\r\nReferer: http://%s\r\nHost: %s\r\nContent-type: application/x-www-form-urlencoded\r\nContent-length: %u\r\n\r\n%s"
 #define HEAD_FORMAT "HEAD %s HTTP/1.0\r\nAccept: */*\r\nUser-Agent: %s\r\nReferer: http://%s\r\nHost: %s\r\n\r\n"
@@ -75,12 +75,15 @@ private:
 	HTTP_RESPONSE	m_Response;
 	int				m_iError;
 
-	bool Connect(char *szHost, int iPort);
+	char			m_szBindAddress[256];
+	int				m_iUseBind;
+
+	bool Connect(char *szHost, int iPort, char *szBindAddress);
 	void CloseConnection();
 	bool Send(char *szData);
-	int  Recv(char *szBuffer, int iBufferSize);	
+	int  Recv(char *szBuffer, int iBufferSize);
 
-    void InitRequest(int iType, char *szURL, char *szPostData, char *szReferer);
+	void InitRequest(int iType, char *szURL, char *szPostData, char *szReferer);
 	void HandleEntity();
 
 	void Process();
@@ -96,7 +99,7 @@ public:
 	char *GetDocument() { return m_Response.response; };
 	int GetDocumentLength() { return m_Response.response_len; };
 
-	CHttpClient();
+	CHttpClient(char *szBindAddress);
 	~CHttpClient();
 };
 
