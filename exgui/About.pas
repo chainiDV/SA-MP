@@ -38,8 +38,8 @@ var
   (
     //---------- Header Start
     //(Line: 'Grand Theft Auto'; Color: $00FF8000; Bold: true),
-    (Line: 'San Andreas'; Color: COLOR_NAME; Bold: true),
-    (Line: 'Multiplayer'; Color: COLOR_TITLE; Bold: true),
+    (Line: 'San Andreas'; Color: $00FFFFFF; Bold: true),
+    (Line: 'Multiplayer'; Color: $000080FF; Bold: true),
     //---------- Header End
 
     (Line: ''; Color: 666; Bold: false), // Spacer
@@ -55,16 +55,16 @@ var
     (Line: ''; Color: 666; Bold: false), // Spacer
     (Line: ''; Color: 666; Bold: false), // Spacer
 
-    //---------- PC Start
+    //---------- Past Coders Start
     (Line: 'Past coders:'; Color: COLOR_TITLE; Bold: true),
     (Line: ''; Color: 666; Bold: false), // Spacer
     (Line: 'Y_Less'; Color: COLOR_NAME; Bold: false),
-    //---------- PC End
+    //---------- Past Coders End
 
     (Line: ''; Color: 666; Bold: false), // Spacer
     (Line: ''; Color: 666; Bold: false), // Spacer
 
-    //---------- BT Start
+    //---------- Beta Testers Start
     (Line: 'Beta Testing:'; Color: COLOR_TITLE; Bold: true),
     (Line: ''; Color: 666; Bold: false), // Spacer
     (Line: 'BlueG, cessil, CrazyBob'; Color: COLOR_NAME; Bold: false),
@@ -72,7 +72,7 @@ var
     (Line: 'Jay, JernejL, kaisersouse'; Color: COLOR_NAME; Bold: false),
     (Line: 'KingJ, Matite, Mmartin'; Color: COLOR_NAME; Bold: false),
     (Line: 'RayW, Si|ent, Wicko'; Color: COLOR_NAME; Bold: false),
-    //---------- BT End
+    //---------- Beta Testers End
 
     (Line: ''; Color: 666; Bold: false), // Spacer
     (Line: ''; Color: 666; Bold: false), // Spacer
@@ -101,7 +101,7 @@ var
     (Line: ''; Color: 666; Bold: false), // Spacer
     (Line: ''; Color: 666; Bold: false), // Spacer
     (Line: ''; Color: 666; Bold: false), // Spacer
-    (Line: ''; Color: 666; Bold: false)  // Spacer
+    (Line: ''; Color: 666; Bold: false) // Spacer
   );
 
   fmAbout: TfmAbout;
@@ -117,7 +117,6 @@ var
 
   // Drawing
   RenderThread: THandle;
-  Thread: Integer;
   bmi: BITMAPINFO;
   hDC1, hDC2: HDC;
   Buf: PBGRArray;
@@ -125,12 +124,13 @@ var
   hNormFont, hBoldFont: HFONT;
   xRect: TRect;
 
+
 implementation
 
 {$R *.dfm}
 
 var
-  CreditsRollY: Integer = 260;
+  CreditsRollY: Integer = 300;
   TempCRY: Integer = 0;
 procedure Flip;
 var
@@ -184,9 +184,7 @@ begin
     EnterCriticalSection(CritSect);
     if GameOver then begin
       LeaveCriticalSection(CritSect);
-      EndThread(0);
-      //Exit;
-
+      Exit;
     end;
     Render;
     LeaveCriticalSection(CritSect);
@@ -217,7 +215,7 @@ begin
 
   Ticks:= timeGetTime;
   GameOver:= false;
-  Thread:= BeginThread(nil, 0, @RenderTimer, nil, 0, RenderThread);
+  BeginThread(nil, 0, @RenderTimer, nil, 0, RenderThread);
 end;
 
 procedure TfmAbout.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -267,7 +265,6 @@ end;
 
 procedure TfmAbout.FormClick(Sender: TObject);
 begin
-  CloseHandle(Thread);
   Close;
 end;
 

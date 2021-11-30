@@ -1,15 +1,18 @@
-unit ExportFavorites;
+unit webrunform;
 
 interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls;
+  Dialogs, StdCtrls, Buttons;
 
 type
-  TfmExportFavorites = class(TForm)
-    cbIncludeSavedPasswords: TCheckBox;
-    bnOk: TButton;
+  Twnd_webrunform = class(TForm)
+    Label1: TLabel;
+    BitBtn1: TBitBtn;
+    BitBtn2: TBitBtn;
+    BitBtn3: TBitBtn;
+
   private
     { Private declarations }
   public
@@ -17,7 +20,7 @@ type
   end;
 
 var
-  fmExportFavorites: TfmExportFavorites;
+  wnd_webrunform: Twnd_webrunform;
 
 implementation
 

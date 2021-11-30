@@ -16,16 +16,10 @@ type
     edInstallLoc: TEdit;
     Label1: TLabel;
     sbBrowse: TSpeedButton;
-    lblModelCacheTag: TLabel;
-    sbBrowseCache: TSpeedButton;
-    lblProxyAddr: TLabel;
-    edCacheLoc: TEdit;
-    edProxyAddress: TEdit;
     procedure bnSaveClick(Sender: TObject);
     procedure bnCancelClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure sbBrowseClick(Sender: TObject);
-    procedure sbBrowseCacheClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -50,8 +44,6 @@ begin
   Reg.OpenKey('SOFTWARE\SAMP', true);
   Reg.WriteBool('SaveServPasses', cbSaveServerPasswords.Checked);
   Reg.WriteBool('SaveRconPasses', cbSaveRconPasswords.Checked);
-  Reg.WriteString('artwork_proxy', edProxyAddress.Text);
-  artwork_proxy:= edProxyAddress.Text;
   Reg.CloseKey;
   Reg.Free;
   Close;
@@ -77,20 +69,12 @@ begin
   Reg.Free;
 
   edInstallLoc.Text:= ExtractFilePath(gta_sa_exe);
-  edCacheLoc.Text:= model_cache;
-  edProxyAddress.Text:= artwork_proxy;
 end;
 
 procedure TfmSettings.sbBrowseClick(Sender: TObject);
 begin
   fmMain.GetGTAExe(Handle);
   edInstallLoc.Text:= ExtractFilePath(gta_sa_exe);
-end;
-
-procedure TfmSettings.sbBrowseCacheClick(Sender: TObject);
-begin
-  fmMain.GetModelCacheFolder(Handle);
-  edCacheLoc.Text:= model_cache;
 end;
 
 end.

@@ -16,16 +16,10 @@ type
     edInstallLoc: TEdit;
     Label1: TLabel;
     sbBrowse: TSpeedButton;
-    lblModelCacheTag: TLabel;
-    sbBrowseCache: TSpeedButton;
-    lblProxyAddr: TLabel;
-    edCacheLoc: TEdit;
-    edProxyAddress: TEdit;
     procedure bnSaveClick(Sender: TObject);
     procedure bnCancelClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure sbBrowseClick(Sender: TObject);
-    procedure sbBrowseCacheClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -69,9 +63,6 @@ begin
   Reg.OpenKey('SOFTWARE\SAMP', true);
   if Reg.ValueExists('SaveServPasses') then
     cbSaveServerPasswords.Checked:= Reg.ReadBool('SaveServPasses');
-
-
-
   if Reg.ValueExists('SaveRconPasses') then
     cbSaveRconPasswords.Checked:= Reg.ReadBool('SaveRconPasses');
   Reg.CloseKey;
@@ -84,12 +75,6 @@ procedure TfmSettings.sbBrowseClick(Sender: TObject);
 begin
   fmMain.GetGTAExe(Handle);
   edInstallLoc.Text:= ExtractFilePath(gta_sa_exe);
-end;
-
-procedure TfmSettings.sbBrowseCacheClick(Sender: TObject);
-begin
-  fmMain.GetModelCacheFolder(Handle);
-  edCacheLoc.Text:= model_cache;
 end;
 
 end.
