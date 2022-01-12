@@ -19,6 +19,35 @@ typedef unsigned long DWORD;
 
 //----------------------------------------------------
 
+#pragma pack(1)
+typedef struct _RGBA {
+	unsigned char r,g,b,a;
+} RGBA, *PRGBA;
+
+#pragma pack(1)
+typedef struct _VECTOR {
+	float X,Y,Z;
+} VECTOR, *PVECTOR;
+
+#pragma pack(1)
+typedef struct _VECTOR2D {
+	float X,Y;
+} VECTOR2D, *PVECTOR2D;
+
+#pragma pack(1)
+typedef struct _MATRIX4X4 {
+	VECTOR right;
+	DWORD  flags;
+	VECTOR up;
+	float  pad_u;
+	VECTOR at;
+	float  pad_a;
+	VECTOR pos;
+	float  pad_p;
+} MATRIX4X4, *PMATRIX4X4;
+
+//----------------------------------------------------
+
 #ifdef _WIN32
 # include <windows.h>
 #else

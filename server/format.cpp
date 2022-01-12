@@ -2,7 +2,11 @@
 // 
 
 #include "main.h"
+#include "amx/amx.h"
+
 #include "format.h"
+
+cell* get_amxaddr(AMX *amx,cell amx_addr);
 
 #define ALT			0x00000001		/* alternate form */
 #define HEXPREFIX	0x00000002		/* add 0x or 0X prefix */
@@ -22,12 +26,12 @@
 		return 0; \
 	}
 
-template <typename U, typename U2>
-void AddString(U **buf_p, size_t &maxlen, const U2 *string, int width, int prec)
+template <typename U>
+void AddString(U **buf_p, size_t &maxlen, const cell *string, int width, int prec)
 {
 	int		size = 0;
 	U		*buf;
-	static U2 nlstr[] = {'(','n','u','l','l',')','\0'};
+	static cell nlstr[] = {'(','n','u','l','l',')','\0'};
 
 	buf = *buf_p;
 
@@ -140,22 +144,24 @@ void AddInt(U **buf_p, size_t &maxlen, int val, int width, int flags)
 {
 	U		text[32];
 	int		digits;
-	unsigned int uiVal;
+	int		signedVal;
 	U		*buf;
 
 	digits = 0;
-	uiVal = (val < 0) ? (val * -1) : val;
+	signedVal = val;
+	if (val < 0)
+		val = -val;
 	do {
-		text[digits++] = '0' + uiVal % 10;
-		uiVal /= 10;
-	} while (uiVal);
+		text[digits++] = '0' + val % 10;
+		val /= 10;
+	} while (val);
 
 	//if (signedVal < 0)
 		//text[digits++] = '-';
 		
 	buf = *buf_p;
 
-	if (val < 0)
+	if (signedVal < 0)
 	{
 		if (flags & ZEROPAD)
 		{
@@ -197,7 +203,7 @@ void AddInt(U **buf_p, size_t &maxlen, int val, int width, int flags)
 }
 
 template <typename U>
-void AddHex(U **buf_p, size_t &maxlen, unsigned int val, int width, int flags)
+void AddHex(U **buf_p, size_t &maxlen, int val, int width, int flags)
 {
 	U		text[32];
 	int		digits;
@@ -410,22 +416,6 @@ reswitch:
 		case 'h':
 		case 'x':
 			AddHex(&buf_p, llen, *get_amxaddr(amx, params[arg]), width, flags);
-			arg++;
-			break;
-		case 'q':
-			cell* _cstr;
-			int _length;
-			char* _result;
-			amx_GetAddr(amx, params[arg], &_cstr);
-			amx_StrLen(_cstr, &_length);
-			if (_length > 0 && (_result = (char*)malloc((_length + 1) * sizeof(*_result))) != NULL) {
-				amx_GetString(_result, _cstr, sizeof(*_result) > 1, _length + 1);
-
-				char* _query = sqlite3_mprintf("%q", _result);
-				AddString(&buf_p, llen, _query, width, prec);
-				sqlite3_free(_query);
-				free(_result);
-			}
 			arg++;
 			break;
 		case '%':

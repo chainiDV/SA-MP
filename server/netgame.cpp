@@ -8,9 +8,11 @@
 */
 
 #include "main.h"
-//#include "anticheat.h"
+#include "anticheat.h"
 
 float fRestartWaitTime=0.0f;
+
+int CanFileBeOpenedForReading(char * filename);
 
 char szGameModeFile[256];
 
@@ -36,13 +38,13 @@ CNetGame::CNetGame()
 {
 	fRestartWaitTime = 0.0f;
 	m_bAdminTeleport = false;
-	m_bAllowWeapons = false;
+	m_bAllowWeapons = FALSE;
 	m_byteWorldTime = 12;
 	m_byteWeather	= 10;
 	m_bStuntBonus   = true;
 	m_fGravity		= 0.008f;
 	m_iDeathDropMoney = 0;
-	m_bZoneNames = false;
+	m_bZoneNames = FALSE;
 	
 	m_longSynchedWeapons = DEFAULT_WEAPONS;
 	// Change number here and in ShutdownForGameModeRestart for default weapon sets
@@ -56,33 +58,20 @@ CNetGame::CNetGame()
 	m_pMenuPool = NULL;
 	m_pTextPool = NULL;
 	m_pGangZonePool = NULL;
-	m_pActorPool = NULL;
-	m_pLabelPool = NULL;
-	m_bLanMode = false;
+	m_bLanMode = FALSE;
 	m_byteMod = 0x01;
-	//m_bACEnabled = pConsole->GetBoolVariable("anticheat");
+	m_bACEnabled = pConsole->GetBoolVariable("anticheat");
 
-	m_bLimitGlobalChatRadius = false;
+	m_bLimitGlobalChatRadius = FALSE;
 	m_fGlobalChatRadius = 10000.0f;
-	m_bLimitGlobalMarkerRadius = false;
-	m_fGlobalMarkerRadius = 10000.0f;
 	m_fNameTagDrawDistance = 70.0f;
 	m_bDisableEnterExits = false;
-	m_bDisableVehMapIcons = false;
-	m_bManualEngineAndLights = false;
-	m_uiMaxRconAttempt = 3;
-	m_bNameTagLOS = true;
-
-	m_iLastTimeSaved = 0;
-	m_uiTickCount = 0;
-	m_uiNumOfTicksInSec = 0;
 
 	m_iCurrentGameModeIndex = 0;
 	m_iCurrentGameModeRepeat = 0;
-	m_bFirstGameModeLoaded = false;
+	m_bFirstGameModeLoaded = FALSE;
 	m_pScriptTimers = new CScriptTimers;
-	m_pThreadedHttp = new CThreadedHttp;
-
+	
 	#ifndef WIN32
 		m_dElapsedTime = 0.0;
 	#endif
@@ -97,27 +86,15 @@ CNetGame::CNetGame()
 
 	DWORD dwPort = pConsole->GetIntVariable("port");
 	DWORD dwMaxPlayers = pConsole->GetIntVariable("maxplayers");
-	bool bLanMode = pConsole->GetBoolVariable("lanmode");
-	//BOOL bMyriad = pConsole->GetBoolVariable("myriad");
+	BOOL bLanMode = pConsole->GetBoolVariable("lanmode");
+	BOOL bMyriad = pConsole->GetBoolVariable("myriad");
 
 	// Setup RakNet
-	m_pRak = new RakServer();
+	m_pRak = RakNetworkFactory::GetRakServerInterface();
 	//m_pRak->InitializeSecurity(0, 0);
 	//m_pRak->SetTrackFrequencyTable(true);
 
-	int iMTUSize = pConsole->GetIntVariable("mtu");
-	if(!m_pRak->SetMTUSize(iMTUSize))
-		logprintf("Can't set the fucking MTU");
-
-	if (iMTUSize != m_pRak->GetMTUSize())
-	{
-		pConsole->SetIntVariable("mtu", m_pRak->GetMTUSize());
-		pConsole->ModifyVariableFlags("mtu", CON_VARFLAG_READONLY);
-	}
-
-	SetXorKey(dwPort);
-
-	if (!m_pRak->Start(dwMaxPlayers, 0, iSleepTime, dwPort, szBindAddress))
+	if (!m_pRak->Start(dwMaxPlayers, 0, 10, dwPort, szBindAddress))
 	{
 		if (szBindAddress)
 			logprintf("Unable to start server on %s:%d. Port in use?", 
@@ -137,6 +114,7 @@ CNetGame::CNetGame()
 	}
 		
 	m_pRak->StartOccasionalPing();
+	//m_pRak->SetMTUSize(1492);
 
 	char* szPass = pConsole->GetStringVariable("password");
 	if ((szPass) && (szPass[0] != 0)) { 
@@ -153,15 +131,15 @@ CNetGame::CNetGame()
 	sprintf(szTime, "%02d:%02d", m_byteWorldTime, 0);
 	pConsole->AddStringVariable("worldtime", CON_VARFLAG_RULE, szTime);
 
-	/*if (bMyriad)
+	if (bMyriad)
 	{
 		pConsole->SetStringVariable("mapname", "Myriad Islands");
 		m_byteMod = 0x02;
-	}*/
+	}
 	
 	// Define LAN mode
 	if(bLanMode) {
-		m_bLanMode = true;
+		m_bLanMode = TRUE;
 	}
 
 	char szScriptFiles[512];
@@ -200,8 +178,6 @@ CNetGame::CNetGame()
 			dwPort, dwMaxPlayers, bLanMode?"ON":"OFF" );
 	}
 
-	m_dwInitialTime = GetTime();
-
 	m_iGameState = GAMESTATE_STOPPED;
 }
 
@@ -216,19 +192,19 @@ CNetGame::~CNetGame()
 	SAFE_DELETE(m_pVehiclePool);
 	SAFE_DELETE(m_pPlayerPool);
 	SAFE_DELETE(m_pScriptTimers);
-	SAFE_DELETE(m_pThreadedHttp);
 	SAFE_DELETE(m_pObjectPool);
 	SAFE_DELETE(m_pPickupPool);
 	SAFE_DELETE(m_pMenuPool);
 	SAFE_DELETE(m_pTextPool);
 	SAFE_DELETE(m_pGangZonePool);
-	SAFE_DELETE(m_pActorPool);
-	SAFE_DELETE(m_pLabelPool);
+	
+	m_pRak->Disconnect(100);
+	UnRegisterRPCs(m_pRak);
 
 	//if (IsACEnabled())
 	//	CAntiCheat::Shutdown(this);
 
-	SAFE_DELETE(m_pRak);
+	RakNetworkFactory::DestroyRakServerInterface(m_pRak);
 }
 
 //----------------------------------------------------
@@ -236,25 +212,25 @@ CNetGame::~CNetGame()
 
 void CNetGame::LoadAllFilterscripts()
 {
-	logprintf("\nFilter Scripts");
+	logprintf("");
+	logprintf("Filter Scripts");
 	logprintf("---------------");
-
-	unsigned int uiScriptCount = 0;
-	char *szScripts = pConsole->GetStringVariable("filterscripts");
-	if (szScripts)
+	int iScriptCount = 0;
+	char* szFilterScript = strtok(pConsole->GetStringVariable("filterscripts"), " ");
+	while (szFilterScript)
 	{
-		std::istringstream issStripts(szScripts);
-		std::string strScript;
-		while (std::getline(issStripts, strScript, ' '))
+		//char szFilterScriptFile[255];
+		//sprintf(szFilterScriptFile, "filterscripts/%s.amx", szFilterScript);
+		logprintf("  Loading filter script '%s.amx'...", szFilterScript);
+		if (m_pFilterScripts->LoadFilterScript(szFilterScript)) //File))
 		{
-			logprintf("  Loading filter script '%s.amx'...", strScript.c_str());
-			if (m_pFilterScripts->LoadFilterScript((char*)strScript.c_str()))
-				uiScriptCount++;
-			else
-				logprintf("  Unable to load filter script '%s.amx'.", strScript.c_str());
+			iScriptCount++;
+		} else {
+			logprintf("  Unable to load filter script '%s.amx'.", szFilterScript);
 		}
+		szFilterScript = strtok(NULL, " ");
 	}
-	logprintf("  Loaded %d filter scripts.\n", uiScriptCount);
+	logprintf("  Loaded %d filter scripts.\n", iScriptCount);
 }
 
 //----------------------------------------------------
@@ -288,7 +264,7 @@ char *CNetGame::GetNextScriptFile()
 
 }
 
-bool CNetGame::SetNextScriptFile(char *szFile)
+BOOL CNetGame::SetNextScriptFile(char *szFile)
 {
 	//char szCurGameModeConsoleVar[64];
 	char szConfigFileName[64];
@@ -318,7 +294,7 @@ bool CNetGame::SetNextScriptFile(char *szFile)
 		//logprintf("Set szGameModeFile to %s\n",szGameModeFile);
 
 		if(!CanFileBeOpenedForReading(szGameModeFile)) {
-			return false;
+			return FALSE;
 		}
 
 		if(!m_iCurrentGameModeRepeat) {
@@ -329,9 +305,9 @@ bool CNetGame::SetNextScriptFile(char *szFile)
 
 		//logprintf("Repeat is %d ConfigRepeat is %d\n",m_iCurrentGameModeRepeat,iConfigRepeatCount);
 
-		m_bFirstGameModeLoaded = true;
+		m_bFirstGameModeLoaded = TRUE;
 
-		return true;
+		return TRUE;
 
 	} else {
 		// set the script from szFile
@@ -340,27 +316,27 @@ bool CNetGame::SetNextScriptFile(char *szFile)
 		sprintf(szGameModeFile,"gamemodes/%s.amx",szFile);
 
 		if(!CanFileBeOpenedForReading(szGameModeFile)) {
-			return false;
+			return FALSE;
 		}
 
 		m_iCurrentGameModeRepeat = 0;
 
-		return true;
+		return TRUE;
 	}
 }
 
 //----------------------------------------------------
 
-void CNetGame::Init(bool bFirst = false)
+void CNetGame::Init(BOOL bFirst = false)
 {
 	m_iSpawnsAvailable = 0;
 
 	// Setup player pool
 	if(!m_pPlayerPool) {
 		m_pPlayerPool = new CPlayerPool();
-	} /*else {
+	} else {
 		m_pPlayerPool->ResetPlayerScoresAndMoney();
-	}*/
+	}
 
 	// Setup vehicle pool
 	if(!m_pVehiclePool) {
@@ -391,26 +367,17 @@ void CNetGame::Init(bool bFirst = false)
 	if (!m_pGangZonePool) {
 		m_pGangZonePool = new CGangZonePool();
 	}
-
-	if (!m_pActorPool) {
-		m_pActorPool = new CActorPool();
-	}
 	
 	// Setup gamemode
 	if(!m_pGameMode) {
 		m_pGameMode = new CGameMode();
 	}
 
-	if (!m_pLabelPool) {
-		m_pLabelPool = new CLabelPool();
-	}
-
 	// Default tags/markers
-	m_bShowNameTags = true;
-	m_bShowPlayerMarkers = true;
-	m_bTirePopping = true;
-	m_bUseCJWalk = false;
-	m_bNameTagLOS = true;
+	m_bShowNameTags = TRUE;
+	m_bShowPlayerMarkers = TRUE;
+	m_bTirePopping = TRUE;
+	m_bUseCJWalk = FALSE;
 
 	// Set the default world time for clients.
 	m_byteWorldTime = 12; // 12:00
@@ -418,21 +385,16 @@ void CNetGame::Init(bool bFirst = false)
 	// Set the default weather
 	m_byteWeather   = 10;
 
-	m_bLimitGlobalChatRadius = false;
+	m_bLimitGlobalChatRadius = FALSE;
 	m_fGlobalChatRadius = 10000.0f;
-	m_bLimitGlobalMarkerRadius = false;
-	m_fGlobalMarkerRadius = 10000.0f;
 	m_fNameTagDrawDistance = 70.0f;
 	m_bDisableEnterExits = false;
-	m_bDisableVehMapIcons = false;
 
 	if (bFirst) LoadAllFilterscripts();
 	// Has to be done here as it need to be AFTER the pools but BEFORE the gamemode
 
 	// Start the gamemode script.
 	m_pGameMode->Load(szGameModeFile);
-
-	logprintf("Number of vehicle models: %d", m_pVehiclePool->GetNumberOfModels());
 
 	// Flag we're in a running state.
 	m_iGameState = GAMESTATE_RUNNING;
@@ -456,8 +418,6 @@ void CNetGame::ShutdownForGameModeRestart()
 	SAFE_DELETE(m_pMenuPool);
 	SAFE_DELETE(m_pTextPool);
 	SAFE_DELETE(m_pGangZonePool);
-	SAFE_DELETE(m_pActorPool);
-	SAFE_DELETE(m_pLabelPool);
 
 	// m_pGameMode->Unload();
 	
@@ -468,16 +428,15 @@ void CNetGame::ShutdownForGameModeRestart()
 	m_pGameMode = NULL;
 	m_pTextPool = NULL;
 	m_pGangZonePool = NULL;
-	m_pLabelPool = NULL;
 
 	fRestartWaitTime = 0.0f;
 	m_bAdminTeleport = false;
-	m_bAllowWeapons = false;
+	m_bAllowWeapons = FALSE;
 	m_byteWorldTime = 12;
 	m_byteWeather	= 10;
 	m_fGravity		= 0.008f;
 	m_iDeathDropMoney = 0;
-	m_bZoneNames = false;
+	m_bZoneNames = FALSE;
 	m_longSynchedWeapons = DEFAULT_WEAPONS;
 
 #ifdef _DEBUG
@@ -507,6 +466,7 @@ void CNetGame::ReInitWhenRestarting()
 	while(bytePlayerID != MAX_PLAYERS) {
 		if(m_pPlayerPool->GetSlotState(bytePlayerID)) {
 			m_pVehiclePool->InitForPlayer(bytePlayerID); // give them all the existing vehicles
+			m_pPickupPool->InitForPlayer(bytePlayerID);
 			m_pObjectPool->InitForPlayer(bytePlayerID);
 			InitGameForPlayer(bytePlayerID);
 			m_pFilterScripts->OnPlayerConnect(bytePlayerID);
@@ -518,20 +478,13 @@ void CNetGame::ReInitWhenRestarting()
 
 //----------------------------------------------------
 
-DWORD CNetGame::GetTime()
-{
-	return (DWORD)RakNet::GetTime();
-}
-
-//----------------------------------------------------
-
 #ifdef WIN32
 
-//#pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "winmm.lib")
 float GetElapsedTime()
 {
-	static bool bTimerInit = false;
-	static bool bUsingOPF  = false;
+	static BOOL bTimerInit = false;
+	static BOOL bUsingOPF  = false;
 	static LONGLONG nTicksPerSec = 0;
 
 	if (!bTimerInit)
@@ -599,14 +552,8 @@ void CNetGame::MasterServerAnnounce(float fElapsedTime)
 #else
 		char szCurrentDir[256];
 		char szAnnounceCmd[256];
-		char* szBindAddress = pConsole->GetStringVariable("bind");
-		if (szBindAddress && szBindAddress[0] == 0)
-			szBindAddress = NULL;
 		getcwd(szCurrentDir,256);
-		if(szBindAddress)
-			sprintf(szAnnounceCmd,"%s/announce %s %s &",szCurrentDir,szPort,szBindAddress);
-		else
-			sprintf(szAnnounceCmd,"%s/announce %s &",szCurrentDir,szPort);
+		sprintf(szAnnounceCmd,"%s/announce %s &",szCurrentDir,szPort);
 		//printf("Running announce. %s",szAnnounceCmd);
 		system(szAnnounceCmd);
 #endif
@@ -616,23 +563,10 @@ void CNetGame::MasterServerAnnounce(float fElapsedTime)
 
 //----------------------------------------------------
 
-void CNetGame::TickUpdate()
-{
-	RakNet::Time64 iTimeNow = RakNet::GetTime64();
-	if ((iTimeNow - m_iLastTimeSaved) >= 1000)
-	{
-		m_iLastTimeSaved = iTimeNow;
-		m_uiNumOfTicksInSec = m_uiTickCount;
-		m_uiTickCount = 0;
-	}
-	m_uiTickCount++;
-}
-
 void CNetGame::Process()
 {
 	float fElapsedTime = GetElapsedTime();
 
-	TickUpdate();
 	UpdateNetwork();
 
 	//if (IsACEnabled())
@@ -645,7 +579,7 @@ void CNetGame::Process()
 		if(m_pObjectPool) m_pObjectPool->Process(fElapsedTime);
 		if(m_pGameMode) m_pGameMode->Frame(fElapsedTime);
 		if(m_pScriptTimers) m_pScriptTimers->Process((DWORD)(fElapsedTime * 1000.0f));
-		if(m_pThreadedHttp) m_pThreadedHttp->Process();
+	
 	} 
 	else if(m_iGameState == GAMESTATE_RESTARTING) 
 	{
@@ -736,101 +670,6 @@ void CNetGame::UpdateNetwork()
 	}
 }
 
-bool CNetGame::SendToPlayer(unsigned int uiPlayerId,
-	UniqueID nUniqId, RakNet::BitStream* pBitStream)
-{
-	if (m_pRak == 0)
-		return false;
-
-	return m_pRak->RPC(nUniqId, pBitStream, HIGH_PRIORITY,
-		RELIABLE, 0, m_pRak->GetPlayerIDFromIndex(uiPlayerId), false, false);
-}
-
-bool CNetGame::SendToAll(UniqueID nUniqId, RakNet::BitStream* pBitStream)
-{
-	return m_pRak->RPC(nUniqId, pBitStream, HIGH_PRIORITY, RELIABLE, 0, UNASSIGNED_PLAYER_ID, true, false);
-}
-
-//----------------------------------------------------
-
-void CNetGame::BroadcastData(UniqueID uniqueID,
-							RakNet::BitStream* pBitStream,
-							WORD wExcludedPlayer,
-							char orderingChannel)
-{
-	PacketReliability reliability;
-
-	if (!m_pPlayerPool) return;
-
-	reliability = RELIABLE_ORDERED;
-	if (orderingChannel == 3)
-		reliability = RELIABLE;
-
-	for (int i = 0; i <= m_pPlayerPool->GetLastPlayerId(); i++)
-	{
-		if (m_pPlayerPool->GetSlotState(i) && (WORD)i != wExcludedPlayer)
-		{
-			m_pRak->RPC(uniqueID, pBitStream, HIGH_PRIORITY, reliability, orderingChannel,
-				m_pRak->GetPlayerIDFromIndex(i), false, false);
-		}
-	}
-}
-
-//----------------------------------------------------
-
-void CNetGame::RPC(	UniqueID uniqueID,
-					RakNet::BitStream* bitStream,
-					WORD wPlayerID,
-					char orderingStream)
-{
-	PacketReliability reliability;
-	PlayerID playerId;
-
-	if (!m_pPlayerPool) return;
-
-	reliability = RELIABLE_ORDERED;
-	if (orderingStream == 3)
-		reliability = RELIABLE;
-
-	if (m_pPlayerPool->GetSlotState(wPlayerID))
-	{
-		playerId = m_pRak->GetPlayerIDFromIndex(wPlayerID);
-
-		m_pRak->RPC(uniqueID, bitStream, HIGH_PRIORITY, reliability,
-			orderingStream, playerId, false, false);
-	}
-}
-
-//----------------------------------------------------
-
-// TODO: Uncomment IsVehicleStreamedIn() when it's done
-void CNetGame::BroadcastVehicleRPC(UniqueID UniqueID, RakNet::BitStream* bitStream,
-	VEHICLEID VehicleID, PLAYERID ExludedPlayer)
-{
-	int iPoolSize, iPlayerIndex;
-	CPlayer* pPlayer;
-
-	if (m_pPlayerPool && m_pVehiclePool)
-	{
-		iPoolSize = m_pPlayerPool->GetLastPlayerId();
-		iPlayerIndex = 0;
-
-		for (; iPlayerIndex < MAX_PLAYERS; iPlayerIndex++)
-		{
-			if (m_pPlayerPool->GetSlotState(iPlayerIndex) && iPlayerIndex != ExludedPlayer)
-			{
-				pPlayer = m_pPlayerPool->GetAt(iPlayerIndex);
-
-				if (pPlayer && VehicleID < MAX_VEHICLES /*&& pPlayer->IsVehicleStreamedIn(VehicleID)*/)
-				{
-					m_pRak->RPC(UniqueID, bitStream, HIGH_PRIORITY,	RELIABLE, 0,
-						m_pRak->GetPlayerIDFromIndex(iPlayerIndex), false, false);
-				}
-			}
-		}
-	}
-}
-
 //----------------------------------------------------
 
 int CNetGame::GetBroadcastSendRateFromPlayerDistance(float fDistance)
@@ -857,8 +696,8 @@ void CNetGame::BroadcastData( RakNet::BitStream *bitStream,
 							  PacketReliability reliability,
 							  char orderingStream,
 							  BYTE byteExcludedPlayer,
-							  bool bBroadcastLocalRangeOnly,
-							  bool bAimSync )
+							  BOOL bBroadcastLocalRangeOnly,
+							  BOOL bAimSync )
 {
 	// Use UNASSIGNED_PLAYER_ID to broadcast to all.
 	
@@ -867,16 +706,16 @@ void CNetGame::BroadcastData( RakNet::BitStream *bitStream,
 	float fDistance;
 	CPlayer *pPlayer;
 	
-	int iExVW = m_pPlayerPool->GetAt(byteExcludedPlayer)->GetVirtualWorld();
+	int iExVW = m_pPlayerPool->GetPlayerVirtualWorld(byteExcludedPlayer);
 
 	while(x!=MAX_PLAYERS)
 	{
-		if( (m_pPlayerPool->GetSlotState(x) == true) && 
+		if( (m_pPlayerPool->GetSlotState(x) == TRUE) && 
 			(x != byteExcludedPlayer) )
 		{
 			pPlayer = m_pPlayerPool->GetAt(x);
 
-			if (pPlayer->GetVirtualWorld() == iExVW)
+			if (m_pPlayerPool->GetPlayerVirtualWorld(x) == iExVW)
 			{
 				fDistance = m_pPlayerPool->GetDistanceFromPlayerToPlayer(byteExcludedPlayer,x);
 
@@ -891,7 +730,7 @@ void CNetGame::BroadcastData( RakNet::BitStream *bitStream,
 					// data is synced/broadcast in range of near players only.
 					if(fDistance < LOCAL_RANGE) {
 						m_pRak->Send(bitStream,priority,reliability,orderingStream,
-							m_pRak->GetPlayerIDFromIndex(x),false);
+							m_pRak->GetPlayerIDFromIndex(x),FALSE);
 					}
 				}
 				else {
@@ -911,7 +750,7 @@ void CNetGame::BroadcastData( RakNet::BitStream *bitStream,
 					
 					if(!r) {				
 						m_pRak->Send(bitStream,priority,reliability,orderingStream,
-							m_pRak->GetPlayerIDFromIndex(x),false);
+							m_pRak->GetPlayerIDFromIndex(x),FALSE);
 					}
 				}
 			}
@@ -922,7 +761,7 @@ void CNetGame::BroadcastData( RakNet::BitStream *bitStream,
 
 //--------------------------------------------------------
 
-void CNetGame::BroadcastDistanceRPC( UniqueID nUniqueID, 
+void CNetGame::BroadcastDistanceRPC( char *szUniqueID, 
 									 RakNet::BitStream *bitStream,
 									 PacketReliability reliability,
 								     BYTE byteExcludedPlayer,
@@ -932,18 +771,18 @@ void CNetGame::BroadcastDistanceRPC( UniqueID nUniqueID,
 	float fDistance;
 	CPlayer *pPlayer;
 	
-	int iExVW = m_pPlayerPool->GetAt(byteExcludedPlayer)->GetVirtualWorld();
+	int iExVW = m_pPlayerPool->GetPlayerVirtualWorld(byteExcludedPlayer);
 
 	while(x!=MAX_PLAYERS)
 	{
-		if( (m_pPlayerPool->GetSlotState(x) == true) && 
+		if( (m_pPlayerPool->GetSlotState(x) == TRUE) && 
 			(x != byteExcludedPlayer) )
 		{
 			pPlayer = m_pPlayerPool->GetAt(x);
-			if (pPlayer->GetVirtualWorld() == iExVW) {
+			if (m_pPlayerPool->GetPlayerVirtualWorld(x) == iExVW) {
 				fDistance = m_pPlayerPool->GetDistanceFromPlayerToPlayer(byteExcludedPlayer,x);
 				if(fDistance <= fUseDistance) {
-					m_pRak->RPC(nUniqueID,bitStream,HIGH_PRIORITY,reliability,
+					m_pRak->RPC(szUniqueID,bitStream,HIGH_PRIORITY,reliability,
 						0,m_pRak->GetPlayerIDFromIndex(x),false,false);
 				}
 			}
@@ -951,7 +790,7 @@ void CNetGame::BroadcastDistanceRPC( UniqueID nUniqueID,
 		x++;
 	}
 
-	m_pRak->RPC(nUniqueID,bitStream,HIGH_PRIORITY,reliability,
+	m_pRak->RPC(szUniqueID,bitStream,HIGH_PRIORITY,reliability,
 			0,m_pRak->GetPlayerIDFromIndex(byteExcludedPlayer),false,false);
 }
 
@@ -990,14 +829,15 @@ void CNetGame::AdjustAimSync(RakNet::BitStream *bitStream, BYTE byteTargetPlayer
 
 void CNetGame::Packet_PlayerSync(Packet *p)
 {
-	CPlayer * pPlayer = GetPlayerPool()->GetAt(p->playerIndex);
-	RakNet::BitStream bsPlayerSync(p);
+	CPlayer * pPlayer = GetPlayerPool()->GetAt((BYTE)p->playerIndex);
+	RakNet::BitStream bsPlayerSync((PCHAR)p->data, p->length, false);
 
 	if(GetGameState() != GAMESTATE_RUNNING) return;
 
+	BYTE				bytePacketID=0;
 	ONFOOT_SYNC_DATA	ofSync;
 	
-	bsPlayerSync.IgnoreBits(8);
+	bsPlayerSync.Read(bytePacketID);
 	bsPlayerSync.Read((PCHAR)&ofSync,sizeof(ONFOOT_SYNC_DATA));
 	
 	if(pPlayer)	{
@@ -1009,14 +849,15 @@ void CNetGame::Packet_PlayerSync(Packet *p)
 
 void CNetGame::Packet_AimSync(Packet *p)
 {
-	CPlayer * pPlayer = GetPlayerPool()->GetAt(p->playerIndex);
-	RakNet::BitStream bsPlayerSync(p);
+	CPlayer * pPlayer = GetPlayerPool()->GetAt((BYTE)p->playerIndex);
+	RakNet::BitStream bsPlayerSync((PCHAR)p->data, p->length, false);
 
 	if(GetGameState() != GAMESTATE_RUNNING) return;
 
+	BYTE			bytePacketID=0;
 	AIM_SYNC_DATA	aimSync;
 	
-	bsPlayerSync.IgnoreBits(8);
+	bsPlayerSync.Read(bytePacketID);
 	bsPlayerSync.Read((PCHAR)&aimSync,sizeof(AIM_SYNC_DATA));
 		
 	if(pPlayer)	{
@@ -1028,14 +869,15 @@ void CNetGame::Packet_AimSync(Packet *p)
 
 void CNetGame::Packet_VehicleSync(Packet *p)
 {
-	CPlayer * pPlayer = GetPlayerPool()->GetAt(p->playerIndex);
-	RakNet::BitStream bsVehicleSync(p);
+	CPlayer * pPlayer = GetPlayerPool()->GetAt((BYTE)p->playerIndex);
+	RakNet::BitStream bsVehicleSync((PCHAR)p->data, p->length, false);
 
 	if(GetGameState() != GAMESTATE_RUNNING) return;
 
+	BYTE		bytePacketID=0;
 	INCAR_SYNC_DATA icSync;
 	
-	bsVehicleSync.IgnoreBits(8);
+	bsVehicleSync.Read(bytePacketID);
 	bsVehicleSync.Read((PCHAR)&icSync,sizeof(INCAR_SYNC_DATA));
 
 	if(pPlayer)	{
@@ -1052,14 +894,15 @@ void CNetGame::Packet_VehicleSync(Packet *p)
 
 void CNetGame::Packet_PassengerSync(Packet *p)
 {
-	CPlayer * pPlayer = GetPlayerPool()->GetAt(p->playerIndex);
-	RakNet::BitStream bsPassengerSync(p);
+	CPlayer * pPlayer = GetPlayerPool()->GetAt((BYTE)p->playerIndex);
+	RakNet::BitStream bsPassengerSync((PCHAR)p->data, p->length, false);
 
 	if(GetGameState() != GAMESTATE_RUNNING) return;
 
+	BYTE bytePacketID=0;
 	PASSENGER_SYNC_DATA psSync;
 	
-	bsPassengerSync.IgnoreBits(8);
+	bsPassengerSync.Read(bytePacketID);
 	bsPassengerSync.Read((PCHAR)&psSync,sizeof(PASSENGER_SYNC_DATA));
 
 	if(pPlayer)	{
@@ -1075,14 +918,15 @@ void CNetGame::Packet_PassengerSync(Packet *p)
 
 void CNetGame::Packet_SpectatorSync(Packet *p)
 {
-	CPlayer * pPlayer = GetPlayerPool()->GetAt(p->playerIndex);
-	RakNet::BitStream bsSpectatorSync(p);
+	CPlayer * pPlayer = GetPlayerPool()->GetAt((BYTE)p->playerIndex);
+	RakNet::BitStream bsSpectatorSync((PCHAR)p->data, p->length, false);
 
 	if(GetGameState() != GAMESTATE_RUNNING) return;
 
+	BYTE bytePacketID=0;
 	SPECTATOR_SYNC_DATA spSync;
 	
-	bsSpectatorSync.IgnoreBits(8);
+	bsSpectatorSync.Read(bytePacketID);
 	bsSpectatorSync.Read((PCHAR)&spSync,sizeof(SPECTATOR_SYNC_DATA));
 
 	if(pPlayer)	{
@@ -1092,14 +936,15 @@ void CNetGame::Packet_SpectatorSync(Packet *p)
 
 void CNetGame::Packet_TrailerSync(Packet *p)
 {
-	CPlayer * pPlayer = GetPlayerPool()->GetAt(p->playerIndex);
-	RakNet::BitStream bsTrailerSync(p);
+	CPlayer * pPlayer = GetPlayerPool()->GetAt((BYTE)p->playerIndex);
+	RakNet::BitStream bsTrailerSync((PCHAR)p->data, p->length, false);
 
 	if(GetGameState() != GAMESTATE_RUNNING) return;
 
+	BYTE bytePacketID=0;
 	TRAILER_SYNC_DATA trSync;
 	
-	bsTrailerSync.IgnoreBits(8);
+	bsTrailerSync.Read(bytePacketID);
 	bsTrailerSync.Read((PCHAR)&trSync, sizeof(TRAILER_SYNC_DATA));
 
 	if(pPlayer)	{
@@ -1112,23 +957,22 @@ void CNetGame::Packet_TrailerSync(Packet *p)
 
 void CNetGame::Packet_StatsUpdate(Packet *p)
 {
-	RakNet::BitStream bsStats(p);
+	RakNet::BitStream bsStats((PCHAR)p->data, p->length, false);
 	CPlayerPool *pPlayerPool = GetPlayerPool();
-	//BYTE bytePlayerID = (BYTE)p->playerIndex;
+	BYTE bytePlayerID = (BYTE)p->playerIndex;
 	int iMoney;
-	int iDrunkLevel;
 	WORD wAmmo;
+	BYTE bytePacketID;
 
-	bsStats.IgnoreBits(8);
+	bsStats.Read(bytePacketID);
 	bsStats.Read(iMoney);
-	bsStats.Read(iDrunkLevel);
 	bsStats.Read(wAmmo);
 
 	if(pPlayerPool) {
-		if(pPlayerPool->GetSlotState(p->playerIndex)) {
-			pPlayerPool->GetAt(p->playerIndex)->m_iMoney = iMoney;
-			pPlayerPool->GetAt(p->playerIndex)->m_iDrunkLevel = iDrunkLevel;
-			pPlayerPool->GetAt(p->playerIndex)->SetCurrentWeaponAmmo((DWORD)wAmmo);
+		if(pPlayerPool->GetSlotState(bytePlayerID)) {
+			pPlayerPool->SetPlayerMoney(bytePlayerID,iMoney);
+			pPlayerPool->SetPlayerAmmo(bytePlayerID, (DWORD)wAmmo);
+			pPlayerPool->GetAt(bytePlayerID)->SetCurrentWeaponAmmo((DWORD)wAmmo);
 		}
 	}	
 }
@@ -1137,55 +981,41 @@ void CNetGame::Packet_StatsUpdate(Packet *p)
 
 void CNetGame::Packet_WeaponsUpdate(Packet *p)
 {
-	if (m_iGameState != GAMESTATE_RUNNING) return;
-	if (p->bitSize < 40 || p->bitSize > 456) return;
-	if (!m_pPlayerPool || !m_pPlayerPool->GetSlotState(p->playerIndex)) return;
+	RakNet::BitStream bsData((PCHAR)p->data, p->length, false);
+	CPlayerPool *pPlayerPool = GetPlayerPool();
+	BYTE bytePlayerID = (BYTE)p->playerIndex;
 
-	CPlayer* pPlayer = m_pPlayerPool->GetAt(p->playerIndex);
-
-	RakNet::BitStream bsData(p);
-	WORD wTargetedPlayer = INVALID_PLAYER_ID;
-	WORD wTargetedActor = INVALID_ACTOR_ID;
-
-	bsData.IgnoreBits(8); // packetid
-	bsData.Read(wTargetedPlayer);
-	bsData.Read(wTargetedActor);
-
-	// TODO: Find out max target range and include the check here also?
-	if (!m_pPlayerPool->GetSlotState(wTargetedPlayer))
-		wTargetedPlayer = INVALID_PLAYER_ID;
-
-	if (!m_pActorPool || !m_pActorPool->GetSlotState(wTargetedActor))
-		wTargetedActor = INVALID_ACTOR_ID;
-
-	pPlayer->m_wTargetedPlayer = wTargetedPlayer;
-	pPlayer->m_wTargetedActor = wTargetedActor;
-
-	DWORD dwSize = bsData.GetNumberOfUnreadBits() / 32;
+	BYTE byteLength = (p->length - 1) / 4; // Should be number of changed weapons
+	
+	//printf("Original: %d New: %d", p->length, byteLength);
+	
 	BYTE byteIndex;
 	BYTE byteWeapon;
 	WORD wordAmmo;
 	
-	if (dwSize == (dwSize * 32))
+	if (pPlayerPool)
 	{
-		while (bsData.GetNumberOfUnreadBits() >= 32)
+		//printf("1");
+		if (pPlayerPool->GetSlotState(bytePlayerID))
 		{
-			byteIndex = 255;
-			byteWeapon = 255;
-			wordAmmo = 0;
-
-			bsData.Read(byteIndex);
-			bsData.Read(byteWeapon);
-
-			if (byteIndex >= 13 || pPlayer->GetWeaponSlot(byteWeapon) != byteIndex)
+			//printf("2");
+			CPlayer* pPlayer = pPlayerPool->GetAt(bytePlayerID);
+			bsData.Read(byteIndex); // Dump the first byte, we don't need it
+			while (byteLength)
 			{
-				return;
+				//printf("3");
+				bsData.Read(byteIndex);
+				bsData.Read(byteWeapon);
+				bsData.Read(wordAmmo);
+				//printf("\n%u %u %i", byteIndex, byteWeapon, wordAmmo);
+				if (byteIndex < (BYTE)13)
+				{
+					//printf("\n%d %d %d", byteIndex, byteWeapon, wordAmmo);
+					pPlayer->m_dwSlotAmmo[byteIndex] = (DWORD)wordAmmo;
+					pPlayer->m_byteSlotWeapon[byteIndex] = byteWeapon;
+				}
+				byteLength--;
 			}
-
-			bsData.Read(wordAmmo);
-
-			pPlayer->m_dwSlotAmmo[byteIndex] = (DWORD)wordAmmo;
-			pPlayer->m_byteSlotWeapon[byteIndex] = byteWeapon;
 		}
 	}
 }
@@ -1194,16 +1024,11 @@ void CNetGame::Packet_WeaponsUpdate(Packet *p)
 
 void CNetGame::Packet_NewIncomingConnection(Packet* packet)
 {
-	char* szIP;
-
-	logprintf("[connection] incoming connection: %s id: %u", packet->playerId.ToString(), packet->playerIndex);
-
-	szIP = packet->playerId.ToString(false);
-
-	if (m_pFilterScripts)
-		m_pFilterScripts->OnIncomingConnection(packet->playerIndex, szIP, packet->playerId.port);
-	if (m_pGameMode)
-		m_pGameMode->OnIncomingConnection(packet->playerIndex, szIP, packet->playerId.port);
+	//logprintf("Incoming Connection: %d (%d)\n", packet->length, packet->playerId);
+	
+	in_addr in;
+	in.s_addr = packet->playerId.binaryAddress;
+	logprintf("Incomming connection: %s:%u",inet_ntoa(in),packet->playerId.port);
 }
 
 //----------------------------------------------------
@@ -1224,8 +1049,8 @@ void CNetGame::Packet_ConnectionLost(Packet* packet)
 
 void CNetGame::Packet_ModifiedPacket(Packet* packet)
 {
-	logprintf("Packet was modified, sent by id: %d, ip: %s",
-					packet->playerIndex, packet->playerId.ToString());
+	//logprintf("Packet was modified, sent by id: %d, ip: %s", 
+					//(unsigned int)packet->playerIndex, packet->playerId.ToString());
 }
 
 //----------------------------------------------------
@@ -1239,89 +1064,50 @@ void CNetGame::Packet_RemotePortRefused(Packet* packet)
 
 void CNetGame::Packet_InGameRcon(Packet* packet)
 {
-	if (!RCONPasswordValid())
-		return;
-
-	CPlayer* pPlayer = m_pPlayerPool->GetAt(packet->playerIndex);
-	if (pPlayer == NULL)
-		return;
-
-	RakNet::BitStream in(packet);
-	if (in.GetNumberOfUnreadBits() < 9)
-		return;
-
-	in.IgnoreBits(8);
-
-	unsigned long ulLen = 0;
-	if (!in.Read(ulLen) || (ulLen < 0 && ulLen > 127))
-		return;
-
-	char szCmd[128];
-	if (!in.Read(szCmd, ulLen))
-		return;
-	szCmd[ulLen] = 0;
-
-	if (!pPlayer->m_bIsAdmin)
+	CPlayer* pPlayer = GetPlayerPool()->GetAt((BYTE)packet->playerIndex);
+	if (pPlayer)
 	{
-		pPlayer->m_uiRconAttempt++;
+		DWORD dwCmdLen;
+		memcpy(&dwCmdLen, &packet->data[1], 4);
+		char* cmd = (char*)malloc(dwCmdLen+1);
+		memcpy(cmd, &packet->data[5], dwCmdLen);
+		cmd[dwCmdLen] = 0;
 
-		in_addr in;
-		in.s_addr = packet->playerId.binaryAddress;
-		char* szIP = inet_ntoa(in);
-
-		char* szCtx, * szPassword = NULL;
-		char* szSubCmd = strtok_s(szCmd, " ", &szCtx);
-		bool bSuccess = false;
-
-		if (szSubCmd != NULL && stricmp(szSubCmd, "login") == 0)
+		if(GetPlayerPool()->IsAdmin((BYTE)packet->playerIndex))
 		{
-			szPassword = strtok_s(NULL, " ", &szCtx);
-			if (szPassword != NULL && strcmp(szPassword, pConsole->GetStringVariable("rcon_password")) == 0)
+			if (strlen(cmd) == 0)
 			{
-				pPlayer->m_bIsAdmin = true;
-				logprintf("RCON (In-Game): Player #%d (%s) has logged in.", packet->playerIndex, pPlayer->GetName());
-				SendClientMessage(packet->playerId, 0xFFFFFFFF, "SERVER: You are logged in as admin.");
-				bSuccess = true;
+				SendClientMessage(packet->playerId, 0xFFFFFFFF, "You forgot the RCON command!");
+				return;
 			}
-			else
+			logprintf("RCON (In-Game): Player [%s] sent command: %s", GetPlayerPool()->GetPlayerName((BYTE)packet->playerIndex), cmd);
+			byteRconUser = (BYTE)packet->playerIndex;
+			pConsole->Execute(cmd);
+			byteRconUser = INVALID_ID;
+		} else {
+			char* szTemp = strtok(cmd, " ");
+			if (szTemp)
 			{
-				logprintf("RCON (In-Game): Player #%d (%s) <%s> failed login. (Attempt: %d/%d)", packet->playerIndex,
-					pPlayer->GetName(), szPassword, pPlayer->m_uiRconAttempt, m_uiMaxRconAttempt);
-				SendClientMessage(packet->playerId, 0xFFFFFFFF, "SERVER: Bad admin password. Repeated attempts will get you banned.");
+				if (stricmp(szTemp, "login") == 0)
+				{
+					szTemp = strtok(NULL, " ");
+					if (szTemp)
+					{
+						if(strcmp(szTemp, pConsole->GetStringVariable("rcon_password")) == 0)
+						{
+							GetPlayerPool()->SetAdmin((BYTE)packet->playerIndex);						
+							logprintf("RCON (In-Game): Player #%d (%s) has logged in.", packet->playerIndex, GetPlayerPool()->GetPlayerName((BYTE)packet->playerIndex));
+							SendClientMessage(packet->playerId, 0xFFFFFFFF,"SERVER: You are logged in as admin.");
+						} else {
+							logprintf("RCON (In-Game): Player #%d (%s) <%s> failed login.", packet->playerIndex, GetPlayerPool()->GetPlayerName((BYTE)packet->playerIndex), szTemp, pConsole->GetStringVariable("rcon_password"));
+							SendClientMessage(packet->playerId, 0xFFFFFFFF,"SERVER: Bad admin password. Repeated attempts will get you banned.");
+						}
+					}
+				}
 			}
 		}
-		else
-		{
-			logprintf("RCON (In-Game): Player #%d (%s) try to use RCON. (Attempt: %d/%d)", packet->playerIndex,
-				pPlayer->GetName(), pPlayer->m_uiRconAttempt, m_uiMaxRconAttempt);
-			SendClientMessage(packet->playerId, 0xFFFFFFFF, "SERVER: You are not logged in. Repeated attempts will get you banned.");
-		}
 
-		if (!bSuccess && pPlayer->m_uiRconAttempt >= m_uiMaxRconAttempt)
-		{
-			logprintf("RCON (In-Game): Player #%d (%s) has been banned.", packet->playerIndex, pPlayer->GetName());
-			AddBan((char*)pPlayer->GetName(), szIP, "RCON BAN");
-			KickPlayer(packet->playerIndex);
-		}
-
-		szPassword = (szPassword != NULL) ? (szPassword) : ("");
-
-		if (m_pFilterScripts)
-			m_pFilterScripts->OnRconLoginAttempt(szIP, szPassword, bSuccess);
-		if (m_pGameMode)
-			m_pGameMode->OnRconLoginAttempt(szIP, szPassword, bSuccess);
-	}
-	else
-	{
-		if (ulLen == 0)
-		{
-			SendClientMessage(packet->playerId, 0xFFFFFFFF, "You forgot the RCON command!");
-			return;
-		}
-		logprintf("RCON (In-Game): Player [%s] sent command: %s", pPlayer->GetName(), szCmd);
-		wRconUser = packet->playerIndex;
-		pConsole->Execute(szCmd);
-		wRconUser = INVALID_ID;
+		free(cmd);
 	}
 }
 
@@ -1329,9 +1115,11 @@ void CNetGame::Packet_InGameRcon(Packet* packet)
 
 void CNetGame::ProcessClientJoin(BYTE bytePlayerID)
 {
+
 	// Perform all init operations.
 	if(GetGameState() == GAMESTATE_RUNNING) {
 		m_pVehiclePool->InitForPlayer(bytePlayerID); // give them all the existing vehicles
+		m_pPickupPool->InitForPlayer(bytePlayerID); // give them all the existing pickups
 		m_pObjectPool->InitForPlayer(bytePlayerID); // give them all the existing map objects
 		InitGameForPlayer(bytePlayerID);
 		m_pPlayerPool->InitPlayersForPlayer(bytePlayerID); // let them know who's on the server
@@ -1340,10 +1128,10 @@ void CNetGame::ProcessClientJoin(BYTE bytePlayerID)
 		
 		// Inform them of their VW as it doesn't actually work if called from OnPlayerConnect
 		// The server is updated but they're not connected fully so don't get it, so resend it
-		int iVW = m_pPlayerPool->GetAt(bytePlayerID)->GetVirtualWorld();
+		BYTE byteVW = m_pPlayerPool->GetPlayerVirtualWorld(bytePlayerID);
 		RakNet::BitStream bsData;
 		bsData.Write(bytePlayerID); // player id
-		bsData.Write(iVW); // VW id
+		bsData.Write(byteVW); // VW id
 		m_pRak->RPC(RPC_ScrSetPlayerVirtualWorld, &bsData, HIGH_PRIORITY, RELIABLE, 0, UNASSIGNED_PLAYER_ID, true, false);
 	} 
 	else if(GetGameState() == GAMESTATE_RESTARTING)
@@ -1351,8 +1139,9 @@ void CNetGame::ProcessClientJoin(BYTE bytePlayerID)
 		InitGameForPlayer(bytePlayerID);
 		m_pPlayerPool->InitPlayersForPlayer(bytePlayerID); // let them know who's on the server
 		// Tell them that the world is currently restarting.
+		RakNet::BitStream bsParams;
 		PlayerID sender = m_pRak->GetPlayerIDFromIndex(bytePlayerID);
-		m_pRak->RPC(RPC_GameModeRestart, NULL, HIGH_PRIORITY,
+		m_pRak->RPC(RPC_GameModeRestart, &bsParams, HIGH_PRIORITY,
 			RELIABLE,0,sender,false,false);
 	}
 	
@@ -1403,8 +1192,6 @@ void CNetGame::InitGameForPlayer(BYTE bytePlayerID)
 {
 	RakNet::BitStream bsInitGame;
 	bool bLanMode = false;
-	short sOnfootRate = pConsole->GetIntVariable("onfoot_rate");
-	short sIncarRate = pConsole->GetIntVariable("incar_rate");
 
 	if(m_bLanMode) bLanMode = true;
 
@@ -1422,22 +1209,17 @@ void CNetGame::InitGameForPlayer(BYTE bytePlayerID)
 	bsInitGame.Write(m_bZoneNames);
 	bsInitGame.Write(m_bUseCJWalk);
 	bsInitGame.Write(m_bAllowWeapons);
-	bsInitGame.Write(m_bLimitGlobalMarkerRadius);
-	bsInitGame.Write(m_fGlobalMarkerRadius);
+	bsInitGame.Write(m_bLimitGlobalChatRadius);
+	bsInitGame.Write(m_fGlobalChatRadius);
 	bsInitGame.Write(m_bStuntBonus);
 	bsInitGame.Write(m_fNameTagDrawDistance);
 	bsInitGame.Write(m_bDisableEnterExits);
-	bsInitGame.Write(m_bManualEngineAndLights);
-	bsInitGame.Write(m_bDisableVehMapIcons);
-	bsInitGame.Write(m_bNameTagLOS);
-	bsInitGame.Write(sOnfootRate);
-	bsInitGame.Write(sIncarRate);
-
+	
 	char* szHostName = pConsole->GetStringVariable("hostname");
 	if(szHostName) {
-		size_t uiHostLen = strlen(szHostName);
-		bsInitGame.Write(uiHostLen);
-		bsInitGame.Write(szHostName, uiHostLen);
+		BYTE byteStrLen = strlen(szHostName);
+		bsInitGame.Write(byteStrLen);
+		bsInitGame.Write(szHostName, byteStrLen);
 	} else {
 		bsInitGame.Write((BYTE)0);
 	}
@@ -1465,7 +1247,7 @@ void CNetGame::SetWeather(BYTE byteWeather)
 	RakNet::BitStream bsWeather;
 	m_byteWeather = byteWeather;
 	bsWeather.Write(m_byteWeather);
-	BroadcastData(RPC_Weather, &bsWeather, INVALID_PLAYER_ID, 2);
+	GetRakServer()->RPC(RPC_Weather, &bsWeather, HIGH_PRIORITY, RELIABLE, 0, UNASSIGNED_PLAYER_ID, true, false);
 	
 	char szWeather[128];
 	sprintf(szWeather, "%d", m_byteWeather);
@@ -1500,20 +1282,6 @@ void CNetGame::KickPlayer(BYTE byteKickPlayer)
 			m_pPlayerPool->Delete(byteKickPlayer,2);			
 		}
 	}
-}
-
-//----------------------------------------------------
-
-void CNetGame::BlockIpAddress(char* ip_mask, RakNet::Time time)
-{
-	m_pRak->AddToBanList(ip_mask, time);
-}
-
-//----------------------------------------------------
-
-void CNetGame::UnBlockIpAddress(char* ip_mask)
-{
-	m_pRak->RemoveFromBanList(ip_mask);
 }
 
 //----------------------------------------------------
@@ -1634,100 +1402,93 @@ void CNetGame::UpdateInstagib()
 
 const PCHAR CNetGame::GetWeaponName(int iWeaponID)
 {
-	switch(iWeaponID) {
-	case WEAPON_BRASSKNUCKLE:
-		return "Brass Knuckles";
-	case WEAPON_GOLFCLUB:
-		return "Golf Club";
-	case WEAPON_NITESTICK:
-		return "Nite Stick";
-	case WEAPON_KNIFE:
-		return "Knife";
-	case WEAPON_BAT:
-		return "Baseball Bat";
-	case WEAPON_SHOVEL:
-		return "Shovel";
-	case WEAPON_POOLSTICK:
-		return "Pool Cue";
-	case WEAPON_KATANA:
-		return "Katana";
-	case WEAPON_CHAINSAW:
-		return "Chainsaw";
-	case WEAPON_DILDO:
-		return "Dildo";
-	case WEAPON_DILDO2:
-		return "Dildo";
-	case WEAPON_VIBRATOR:
-		return "Vibrator";
-	case WEAPON_VIBRATOR2:
-		return "Vibrator";
-	case WEAPON_FLOWER:
-		return "Flowers";
-	case WEAPON_CANE:
-		return "Cane";
-	case WEAPON_GRENADE:
-		return "Grenade";
-	case WEAPON_TEARGAS:
-		return "Teargas";
-	case WEAPON_MOLTOV:
-		return "Molotov Cocktail";
-	case WEAPON_COLT45:
-		return "Colt 45";
-	case WEAPON_SILENCED:
-		return "Silenced Pistol";
-	case WEAPON_DEAGLE:
-		return "Desert Eagle";
-	case WEAPON_SHOTGUN:
-		return "Shotgun";
-	case WEAPON_SAWEDOFF:
-		return "Sawn-off Shotgun";
-	case WEAPON_SHOTGSPA:
-		return "Combat Shotgun";
-	case WEAPON_UZI:
-		return "UZI";
-		break;
-	case WEAPON_MP5:
-		return "MP5";
-	case WEAPON_AK47:
-		return "AK47";
-	case WEAPON_M4:
-		return "M4";
-	case WEAPON_TEC9:
-		return "TEC9";
-	case WEAPON_RIFLE:
-		return "Rifle";
-	case WEAPON_SNIPER:
-		return "Sniper Rifle";
-	case WEAPON_ROCKETLAUNCHER:
-		return "Rocket Launcher";
-	case WEAPON_HEATSEEKER:
-		return "Heat Seaker";
-	case WEAPON_FLAMETHROWER:
-		return "Flamethrower";
-	case WEAPON_MINIGUN:
-		return "Minigun";
-	case WEAPON_SATCHEL:
-		return "Satchel Explosives";
-	case WEAPON_BOMB:
-		return "Bomb";
-	case WEAPON_SPRAYCAN:
-		return "Spray Can";
-	case WEAPON_FIREEXTINGUISHER:
-		return "Fire Extinguisher";
-	case WEAPON_CAMERA:
-		return "Camera";
-	case WEAPON_NIGHT_VIS_GOGGLES:
-		return "Night Vision";
-	case WEAPON_THERMAL_GOGGLES:
-		return "Thermal Goggles";
-	case WEAPON_PARACHUTE:
-		return "Parachute";
-	case WEAPON_VEHICLE:
-		return "Vehicle";
-	case WEAPON_DROWN:
-		return "Drowned";
-	case WEAPON_COLLISION:
-		return "Splat";
+	switch(iWeaponID) { 
+      case WEAPON_BRASSKNUCKLE: 
+         return "Brass Knuckles"; 
+      case WEAPON_GOLFCLUB: 
+         return "Golf Club"; 
+      case WEAPON_NITESTICK: 
+         return "Nite Stick"; 
+      case WEAPON_KNIFE: 
+         return "Knife"; 
+      case WEAPON_BAT: 
+         return "Baseball Bat"; 
+      case WEAPON_SHOVEL: 
+         return "Shovel"; 
+      case WEAPON_POOLSTICK: 
+         return "Pool Cue"; 
+      case WEAPON_KATANA: 
+         return "Katana"; 
+      case WEAPON_CHAINSAW: 
+         return "Chainsaw"; 
+      case WEAPON_DILDO: 
+         return "Dildo"; 
+      case WEAPON_DILDO2: 
+         return "Dildo"; 
+      case WEAPON_VIBRATOR: 
+         return "Vibrator"; 
+      case WEAPON_VIBRATOR2: 
+         return "Vibrator"; 
+      case WEAPON_FLOWER: 
+         return "Flowers"; 
+      case WEAPON_CANE: 
+         return "Cane"; 
+      case WEAPON_GRENADE: 
+         return "Grenade"; 
+      case WEAPON_TEARGAS: 
+         return "Teargas"; 
+      case WEAPON_COLT45: 
+         return "Colt 45"; 
+      case WEAPON_SILENCED: 
+         return "Silenced Pistol"; 
+      case WEAPON_DEAGLE: 
+         return "Desert Eagle"; 
+      case WEAPON_SHOTGUN: 
+         return "Shotgun"; 
+      case WEAPON_SAWEDOFF: 
+         return "Sawn-off Shotgun"; 
+      case WEAPON_SHOTGSPA: // wtf? 
+         return "Combat Shotgun"; 
+      case WEAPON_UZI: 
+         return "UZI"; 
+      case WEAPON_MP5: 
+         return "MP5"; 
+      case WEAPON_AK47: 
+         return "AK47"; 
+      case WEAPON_M4: 
+         return "M4"; 
+      case WEAPON_TEC9: 
+         return "TEC9"; 
+      case WEAPON_RIFLE: 
+         return "Rifle"; 
+      case WEAPON_SNIPER: 
+         return "Sniper Rifle"; 
+      case WEAPON_ROCKETLAUNCHER: 
+         return "Rocket Launcher"; 
+      case WEAPON_HEATSEEKER: 
+         return "Heat Seaker"; 
+      case WEAPON_FLAMETHROWER: 
+         return "Flamethrower"; 
+      case WEAPON_MINIGUN: 
+         return "Minigun"; 
+      case WEAPON_SATCHEL: 
+         return "Satchel Explosives"; 
+      case WEAPON_BOMB: 
+         return "Bomb"; 
+      case WEAPON_SPRAYCAN: 
+         return "Spray Can"; 
+      case WEAPON_FIREEXTINGUISHER: 
+         return "Fire Extinguisher"; 
+      case WEAPON_CAMERA: 
+         return "Camera"; 
+      case WEAPON_PARACHUTE: 
+         return "Parachute"; 
+      case WEAPON_VEHICLE: 
+         return "Vehicle"; 
+      case WEAPON_DROWN: 
+         return "Drowned"; 
+      case WEAPON_COLLISION: 
+         return "Splat";
 	}
 
 	return "";

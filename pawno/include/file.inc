@@ -7,6 +7,7 @@
   #endinput
 #endif
 #define _file_included
+#pragma library File
 
 enum filemode
     {

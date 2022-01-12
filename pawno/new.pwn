@@ -1,4 +1,4 @@
-#include <sampc>
+#include <a_samp>
 
 // This is a comment
 // uncomment the line below if you want to write a filterscript
@@ -87,6 +87,11 @@ public OnVehicleDeath(vehicleid, killerid)
 }
 
 public OnPlayerText(playerid, text[])
+{
+	return 1;
+}
+
+public OnPlayerPrivmsg(playerid, recieverid, text[])
 {
 	return 1;
 }

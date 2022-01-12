@@ -1,70 +1,157 @@
+//----------------------------------------------------
+//
+//	HTTP/1.0 Client Procedures.
+//	(c) 2002-2005 Kye Bitossi
+//
+//  Basic web document fetcher.
+//
+//  Version: $Id: httpclient.cpp,v 1.2 2006/03/20 17:44:19 kyeman Exp $
+//
+//----------------------------------------------------
 
-#include "main.h"
-
-CHttpClient::CHttpClient(char* szBindAddress)
-{
-	memset(&m_Request, 0, sizeof(m_Request));
-	memset(&m_Response, 0, sizeof(m_Response));
-	memset(m_szBindAddress, 0, sizeof(m_szBindAddress));
-	
-	m_bHasBindAddress = false;
-
-	if (szBindAddress)
-	{
-		strcpy(m_szBindAddress, szBindAddress);
-		m_bHasBindAddress = true;
-	}
-
-	m_iError = 0;
-	m_iSocket = -1;
+#include <stdio.h>
+#include <string.h>
 
 #ifdef WIN32
-	WSADATA wsaData;
-	WSAStartup(0x202, &wsaData);
+# include <windows.h>
+#else
+# include <stdlib.h>
+# include <unistd.h>
+# include <errno.h>
+# include <sys/types.h>
+# include <sys/socket.h>
+# include <sys/wait.h>
+# include <netinet/in.h>
+# include <netdb.h>
+#endif
+
+#include "httpclient.h"
+#include "runutil.h"
+#include "system.h"
+
+//----------------------------------------------------
+
+CHttpClient::CHttpClient()
+{
+	memset(&m_Request,0,sizeof(HTTP_REQUEST));
+	memset(&m_Response,0,sizeof(HTTP_RESPONSE));
+	m_iError = HTTP_SUCCESS; // Request is successful until otherwise indicated
+	m_iSocket = (-1);
+
+// Winsock init
+#ifdef WIN32
+	WORD				wVersionRequested;
+	WSADATA				wsaData;
+	wVersionRequested = MAKEWORD(2,2);
+	WSAStartup(wVersionRequested,&wsaData);
 #endif
 }
 
+//----------------------------------------------------
+
 CHttpClient::~CHttpClient()
 {
-	CloseConnection();
+	// Deallocate the request data memory
+	if(m_Request.file) free(m_Request.file);
+	if(m_Request.host) free(m_Request.host);
+	if(m_Request.referer) free(m_Request.referer);
 
-	if (m_Response.header)
-		free(m_Response.header);
-	if (m_Response.response)
-		free(m_Response.response);
+	if(m_Request.rtype == HTTP_POST) {
+		if(m_Request.data) free(m_Request.data);
+	}
 
+	// Deallocate the response data memory
+	if(m_Response.header) free(m_Response.header);
+	if(m_Response.response) free(m_Response.response);
+
+// Winsock cleanup
 #ifdef WIN32
 	WSACleanup();
 #endif
 }
 
-bool CHttpClient::GetHeaderValue(char* szHeaderName, char* szReturnBuffer, int iBufSize)
+//----------------------------------------------------
+
+int CHttpClient::ProcessURL(int iType, char *szURL, char *szPostData, char *szReferer)
 {
-	char* szHeaderStart;
-	char* szHeaderEnd;
+	InitRequest(iType,szURL,szPostData,szReferer);
+
+	Process();
+
+	return m_iError;
+}
+
+//----------------------------------------------------
+
+bool CHttpClient::GetHeaderValue(char *szHeaderName,char *szReturnBuffer, int iBufSize)
+{
+	char *szHeaderStart;
+	char *szHeaderEnd;
 	int iLengthSearchHeader = strlen(szHeaderName);
 	int iCopyLength;
 
-	szHeaderStart = Util_stristr(m_Response.header, szHeaderName);
-	if (!szHeaderStart) {
+	szHeaderStart = Util_stristr(m_Response.header,szHeaderName);
+	if(!szHeaderStart) {
 		return false;
 	}
-	szHeaderStart += iLengthSearchHeader + 1;
+	szHeaderStart+=iLengthSearchHeader+1;
 
-	szHeaderEnd = strchr(szHeaderStart, '\n');
-	if (!szHeaderEnd) {
-		szHeaderEnd = m_Response.header + strlen(m_Response.header);
+	szHeaderEnd = strchr(szHeaderStart,'\n');
+	if(!szHeaderEnd) {
+		szHeaderEnd = m_Response.header + strlen(m_Response.header); // (END OF STRING)
 	}
 
 	iCopyLength = szHeaderEnd - szHeaderStart;
-	if (iBufSize < iCopyLength) {
+	if(iBufSize < iCopyLength) {
 		return false;
 	}
 
-	memcpy(szReturnBuffer, szHeaderStart, iCopyLength);
+	memcpy(szReturnBuffer,szHeaderStart,iCopyLength);
 	szReturnBuffer[iCopyLength] = '\0';
 	return true;
 }
+
+//----------------------------------------------------
+
+bool CHttpClient::Connect(char *szHost, int iPort)
+{
+	struct sockaddr_in	sa;
+	struct hostent		*hp;
+
+	// Hostname translation
+	if((hp=(struct hostent *)gethostbyname(szHost)) == NULL ) {
+		m_iError=HTTP_ERROR_BAD_HOST;
+		return false;
+	}
+
+	// Prepare a socket	
+	memset(&sa,0,sizeof(sa));
+	memcpy(&sa.sin_addr,hp->h_addr,hp->h_length);
+	sa.sin_family = hp->h_addrtype;
+	sa.sin_port = htons((unsigned short)iPort);
+
+	if((m_iSocket=socket(AF_INET,SOCK_STREAM,0)) < 0) {
+		m_iError=HTTP_ERROR_NO_SOCKET;
+		return false;
+	}
+
+	// Set a 1 second time out...
+	struct timeval timeout;
+	timeout.tv_sec = 1;
+	timeout.tv_usec = 0;
+	setsockopt(m_iSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+
+	// Try to connect
+	if(connect(m_iSocket,(struct sockaddr *)&sa,sizeof sa) < 0)	{
+		CloseConnection();
+		m_iError=HTTP_ERROR_CANT_CONNECT;
+		return false;
+	}
+
+	return true;
+}
+
+//----------------------------------------------------
 
 void CHttpClient::CloseConnection()
 {
@@ -75,307 +162,259 @@ void CHttpClient::CloseConnection()
 #endif
 }
 
-bool CHttpClient::Send(char* szData)
-{
-	if (send(m_iSocket, szData, strlen(szData), 0) < 0) {
+//----------------------------------------------------
+
+bool CHttpClient::Send(char *szData)
+{	
+	if(send(m_iSocket,szData,strlen(szData),0) < 0) {	
 		m_iError = HTTP_ERROR_CANT_WRITE;
 		return false;
 	}
 	return true;
 }
 
-int CHttpClient::Recv(char* szBuffer, int iBufferSize)
-{
-	return recv(m_iSocket, szBuffer, iBufferSize, 0);
+//----------------------------------------------------
+
+int CHttpClient::Recv(char *szBuffer, int iBufferSize)
+{	
+	return recv(m_iSocket,szBuffer,iBufferSize,0);
 }
 
-void CHttpClient::InitRequest(int iType, char* szURL, char* szPostData, char* szReferer)
-{
-	char szUseURL[2048];
-	char* slash_ptr;
-	unsigned int slash_pos;
-	char* port_char;
-	char port[128];
+//----------------------------------------------------
 
-	memset(szUseURL, 0, sizeof(szUseURL));
-	strncpy(szUseURL, szURL, sizeof(szUseURL));
-	
+void CHttpClient::InitRequest(int iType, char *szURL, char *szPostData, char *szReferer)
+{
+	char		 *port;			// port string
+	char		 *port_char;	// position of ':' if any
+	unsigned int slash_pos;		// position of first '/' numeric
+	char		 *slash_ptr;
+	char		 *szUseURL; // incase we have to cat something to it.
+
+	szUseURL = (char *)malloc(strlen(szURL)+256);
+	strcpy(szUseURL,szURL);
+
 	m_Request.rtype = iType;
-	
-	strncpy(m_Request.referer, szReferer, sizeof(m_Request.referer));
-	
-	if (iType == HTTP_POST) {
-		strncpy(m_Request.data, szPostData, sizeof(m_Request.data));
+	m_Request.referer = (char *)malloc(strlen(szReferer)+1);
+	strcpy(m_Request.referer,szReferer);
+
+	if(iType==HTTP_POST) {
+		m_Request.data=(char *)malloc(strlen(szPostData)+1);
+		strcpy(m_Request.data,szPostData);
 	}
 
-	slash_ptr = strchr(szUseURL, '/');
-	if (!slash_ptr) {
-		strcat(szUseURL, "/");
-		slash_ptr = strchr(szUseURL, '/');
-	}
-	
-	slash_pos = (slash_ptr - szUseURL);
-	if (slash_pos > 256)
-		slash_pos = 256;
-	memcpy(m_Request.host, szUseURL, slash_pos);
-	m_Request.host[slash_pos] = '\0';
-	
-	strncpy(m_Request.file, strchr(szUseURL, '/'), sizeof(m_Request.file));
+	// Copy hostname from URL
+	slash_ptr = strchr(szUseURL,'/');
 
-	port_char = strchr(m_Request.host, ':');
-	if (port_char)
-	{
-		memset(port, 0, sizeof(port));
-		strncpy(port, port_char + 1, sizeof(port));
-		*port_char = '\0';
+	if(!slash_ptr) {
+		strcat(szUseURL,"/");
+		slash_ptr = strchr(szUseURL,'/');
+	}
+
+	slash_pos=(slash_ptr-szUseURL);
+	m_Request.host=(char *)malloc(slash_pos+1);
+	memcpy(m_Request.host,szUseURL,slash_pos);
+	m_Request.host[slash_pos]='\0';
+
+	// Copy the rest of the url to the file string.
+	m_Request.file=(char *)malloc((strlen(szUseURL)-slash_pos)+1);
+	strcpy(m_Request.file,strchr(szUseURL,'/'));
+
+	// Any special port used in the URL?
+	if((port_char=strchr(m_Request.host,':'))!=NULL) {
+		port=(char *)malloc(strlen(port_char));
+		strcpy(port,port_char+1);
+		*port_char='\0';
 		m_Request.port = atoi(port);
+		free(port);
 	}
-	else
+	else {
 		m_Request.port = 80;
+	}
+
+	free(szUseURL);
 }
+
+//----------------------------------------------------
+
+void CHttpClient::Process()
+{
+	int   header_len;
+	char  *request_head;
+
+	if(!Connect(m_Request.host,m_Request.port)) {
+		return;
+	}
+
+	// Build the HTTP Header
+	switch(m_Request.rtype)
+	{
+		case HTTP_GET:
+			header_len = strlen(m_Request.file)+strlen(m_Request.host)+
+				(strlen(GET_FORMAT)-8)+strlen(USER_AGENT)+
+				strlen(m_Request.referer);
+			request_head = (char *)malloc(header_len+1);
+			sprintf(request_head,GET_FORMAT,m_Request.file,USER_AGENT,m_Request.referer,m_Request.host);
+			break;
+
+		case HTTP_HEAD:
+			header_len = strlen(m_Request.file)+strlen(m_Request.host)+
+				(strlen(HEAD_FORMAT)-8)+strlen(USER_AGENT)+
+				strlen(m_Request.referer);
+			request_head = (char *)malloc(header_len+1);
+			sprintf(request_head,HEAD_FORMAT,m_Request.file,USER_AGENT,m_Request.referer,m_Request.host);
+			break;
+
+		case HTTP_POST:
+			header_len = strlen(m_Request.data)+strlen(m_Request.file)+
+				strlen(m_Request.host)+strlen(POST_FORMAT)+
+				strlen(USER_AGENT)+strlen(m_Request.referer);
+			request_head = (char *)malloc(header_len+1);
+			sprintf(request_head,POST_FORMAT,m_Request.file,USER_AGENT,m_Request.referer,m_Request.host,strlen(m_Request.data),m_Request.data);
+			break;	
+	}
+
+	if(!Send(request_head)) {	
+		free(request_head);
+		return;
+	}
+
+	free(request_head);
+
+	HandleEntity();
+}
+
+//----------------------------------------------------
+
+#define RECV_BUFFER_SIZE 2048
 
 void CHttpClient::HandleEntity()
 {
-	int bytes_read;
-	int bytes_total;
-	char buffer[4096];
-	bool header_got;
-	char* head_end;
-	char response_code_str[4];
-	char szContentType[256];
-	char* pcontent_buf;
-	int content_len;
-	char content_len_str[64];
-	bool has_content_len;
+	int				bytes_total		= 0;
+	int				bytes_read		= 0;
+	char			*buffer			= (char *)malloc(RECV_BUFFER_SIZE);
+	char			*response		= (char *)malloc(1);
+	char			*header;
+	char			*head_end;
+	char			*pcontent_buf;
+	char			*content_len_str;
 
-	bytes_total = 0;
-	header_got = false;
-	has_content_len = false;
-	content_len = 0;
+	bool			header_got		= false;
+	bool			has_content_len = false;
+	int				header_len		= 0;
+	int				content_len		= 0;
 
-	memset(content_len_str, 0, 64);
-	memset(buffer, 0, sizeof(buffer));
-
-	m_Response.header = NULL;
-	m_Response.response = NULL;
-	m_Response.header_len = 0;
-	m_Response.response_len = 0;
-
-	while ((bytes_read = Recv(buffer, sizeof(buffer))) > 0)
+	while((bytes_read=Recv(buffer,RECV_BUFFER_SIZE)) > 0)
 	{
-		SLEEP(5);
-
-		bytes_total += bytes_read;
-
-		m_Response.response = (char*)realloc(m_Response.response, bytes_total + 1);
-		if (!m_Response.response)
+		bytes_total+=bytes_read;
+		response=(char *)realloc(response,bytes_total+1);
+		memcpy(response+(bytes_total-bytes_read),buffer,(unsigned int)bytes_read);
+	
+		if(!header_got)
 		{
-			bytes_total = 0;
-			break;
-		}
-
-		memcpy(m_Response.response + (bytes_total - bytes_read), buffer, bytes_read);
-		m_Response.response[bytes_total] = '\0';
-
-		if (!header_got)
-		{
-			if ((head_end = strstr(m_Response.response, "\r\n\r\n")) != NULL
-				|| (head_end = strstr(m_Response.response, "\n\n")) != NULL)
+			if((head_end=strstr(response,"\r\n\r\n"))!=NULL
+				|| (head_end=strstr(response,"\n\n"))!=NULL)
 			{
-				header_got = true;
 
-				m_Response.header_len = (head_end - m_Response.response);
-				m_Response.header = (char*)calloc(1, m_Response.header_len + 1);
-				memcpy(m_Response.header, m_Response.response, m_Response.header_len);
-				m_Response.header[m_Response.header_len] = '\0';
+				header_got=true;
 
-				if ((*(m_Response.response + m_Response.header_len)) == '\n')
+				header_len=(head_end-response);
+				header=(char *)malloc(header_len+1);
+				memcpy(header,response,header_len);
+				header[header_len]='\0';
+
+				if((*(response+header_len))=='\n') /* LFLF */
 				{
-					bytes_total -= (m_Response.header_len + 2);
-					memmove(m_Response.response, (m_Response.response + (m_Response.header_len + 2)), bytes_total);
+					bytes_total-=(header_len+2);
+					memmove(response,(response+(header_len+2)),bytes_total);
 				}
-				else
+				else /* assume CRLFCRLF */
 				{
-					bytes_total -= (m_Response.header_len + 4);
-					memmove(m_Response.response, (m_Response.response + (m_Response.header_len + 4)), bytes_total);
+					bytes_total-=(header_len+4);
+					memmove(response,(response+(header_len+4)),bytes_total);
 				}
 
-				pcontent_buf = Util_stristr(m_Response.header, "CONTENT-LENGTH:");
-				if (pcontent_buf)
+				/* find the content-length if available */
+				if((pcontent_buf=Util_stristr(header,"CONTENT-LENGTH:"))!=NULL)
 				{
-					// Seems like things this part fucked up in linux and windows version.
-					// For some reason the content_len always 0, and content_len_str always empty.
-					pcontent_buf += 16;
-					while (*pcontent_buf != '\n' && *pcontent_buf)
+					has_content_len=true;
+
+					pcontent_buf+=16;
+					while(*pcontent_buf!='\n' && *pcontent_buf)
 					{
-						pcontent_buf++;
+						*pcontent_buf++;
 						content_len++;
 					}
 
-					pcontent_buf -= content_len;
-					memcpy(content_len_str, pcontent_buf, content_len);
+					content_len_str=(char *)malloc(content_len+1);
+					pcontent_buf-=content_len;
+					memcpy(content_len_str,pcontent_buf,content_len);
 
-					if (content_len_str[content_len - 1] == '\r')
-						content_len_str[content_len - 1] = '\0';
-					else
-						content_len_str[content_len] = '\0';
+					if(content_len_str[content_len-1] == '\r') {
+						content_len_str[content_len-1]='\0';
+					}
+					else {
+						content_len_str[content_len]='\0';
+					}
 
-					content_len = atoi(content_len_str);
-					if (content_len > 0x100000)
-					{
+					content_len=atoi(content_len_str);
+					free(content_len_str);
+
+					if(content_len > MAX_ENTITY_LENGTH) {
 						CloseConnection();
 						m_iError = HTTP_ERROR_CONTENT_TOO_BIG;
 						return;
 					}
-
-					has_content_len = true;
 				}
 			}
 		}
 
-		if (header_got && has_content_len)
-			if (bytes_total >= content_len)
-				break;
-
-		if (bytes_total > 0x100000)
-		{
-			CloseConnection();
-			m_iError = HTTP_ERROR_CONTENT_TOO_BIG;
-			return;
-		}
+		if(header_got && has_content_len)
+			if(bytes_total>=content_len) break;
 	}
 
 	CloseConnection();
+	
+	response[bytes_total]='\0';
+	free(buffer);
 
-	if(m_Response.response)
-		m_Response.response[bytes_total] = '\0';
-
-	if (bytes_total <= 0 || !header_got || Util_strnicmp(m_Response.header, "HTTP", 4) != 0)
-	{
+	// check the returned header
+	if(!header_got || *(DWORD *)header != 0x50545448) { // 'HTTP'
 		m_iError = HTTP_ERROR_MALFORMED_RESPONSE;
 		return;
 	}
 
-	strncpy(response_code_str, m_Response.header + 9, 3);
+	// Now fill in the response code
+	char response_code_str[4];
+	response_code_str[0] = *(header+9);
+	response_code_str[1] = *(header+10);
+	response_code_str[2] = *(header+11);
 	response_code_str[3] = '\0';
-
 	m_Response.response_code = atoi(response_code_str);
-	m_Response.response_len = bytes_total;
-	m_Response.content_type = CONTENT_TYPE_HTML;
 
-	if (GetHeaderValue("CONTENT-TYPE:", szContentType, sizeof(szContentType)))
-	{
-		if (strstr(szContentType, "text/html") != NULL)
+	// Copy over the document entity strings and sizes
+	m_Response.header		= header;
+	m_Response.header_len	= header_len;
+	m_Response.response		= response;
+	m_Response.response_len	= bytes_total;
+
+	//printf("Code: %u\n\n%s\n",m_Response.response_code,m_Response.header);
+
+	// Try and determine the document type
+	m_Response.content_type = CONTENT_TYPE_HTML; // default to html
+
+	char szContentType[256];
+
+	if(GetHeaderValue("CONTENT-TYPE:",szContentType,256) == true) {
+		if(strstr(szContentType,"text/html") != NULL) {
 			m_Response.content_type = CONTENT_TYPE_HTML;
-		else if (strstr(szContentType, "text/plain") != NULL)
-			m_Response.content_type = CONTENT_TYPE_TEXT;
-		else
-			m_Response.content_type = CONTENT_TYPE_UNKNOWN;
-	}
-}
-
-bool CHttpClient::Connect(char* szHost, int iPort)
-{
-	struct hostent* hp;
-	struct sockaddr_in sa;
-	int optval[2];
-
-	hp = (struct hostent*)gethostbyname(szHost);
-	if (hp == NULL) {
-		m_iError = HTTP_ERROR_BAD_HOST;
-		return false;
-	}
-
-	memset(&sa, 0, sizeof(sa));
-	memcpy(&sa.sin_addr, hp->h_addr, hp->h_length);
-	sa.sin_family = hp->h_addrtype;
-	sa.sin_port = htons((unsigned short)iPort);
-
-	if (m_bHasBindAddress)
-	{
-		hp = (struct hostent*)gethostbyname(szHost);
-		if (!hp)
-		{
-			m_iError = HTTP_ERROR_BAD_HOST;
-			return 0;
 		}
-		memcpy(&sa.sin_addr, hp->h_addr, hp->h_length);
-		sa.sin_family = hp->h_addrtype;
-		sa.sin_port = 0;
+		else if(strstr(szContentType,"text/plain") != NULL) {
+			m_Response.content_type = CONTENT_TYPE_TEXT;
+		} else {
+			m_Response.content_type = CONTENT_TYPE_UNKNOWN;
+		}
 	}
-
-	m_iSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (m_iSocket < 0) {
-		m_iError = HTTP_ERROR_NO_SOCKET;
-		return false;
-	}
-
-	if (m_bHasBindAddress && bind(m_iSocket, (struct sockaddr*)&sa, sizeof(sa)) < 0)
-	{
-		m_iError = HTTP_ERROR_CANT_CONNECT;
-		return false;
-	}
-
-	optval[0] = 20000;
-	optval[1] = 20000;
-	setsockopt(m_iSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&optval, sizeof(optval));
-
-	if (connect(m_iSocket, (struct sockaddr*)&sa, sizeof sa) < 0) {
-		CloseConnection();
-		m_iError = HTTP_ERROR_CANT_CONNECT;
-		return false;
-	}
-
-	return true;
 }
 
-void CHttpClient::Process()
-{
-	int header_len;
-	int data_len;
 
-	if (!Connect(m_Request.host, m_Request.port)) {
-		return;
-	}
-
-	switch (m_Request.rtype)
-	{
-	case HTTP_GET:
-		header_len = strlen(m_Request.file) + strlen(m_Request.host) +
-			strlen(m_Request.referer) + (strlen(GET_FORMAT) - 8) + strlen(USER_AGENT);
-		if (header_len > sizeof(m_Request.request_head))
-			return;
-		sprintf(m_Request.request_head, GET_FORMAT, m_Request.file, USER_AGENT,
-			m_Request.referer, m_Request.host);
-		break;
-	case HTTP_POST:
-		data_len = strlen(m_Request.data);
-		header_len = data_len + strlen(m_Request.file) +
-			strlen(m_Request.host) + strlen(m_Request.referer) +
-			strlen(POST_FORMAT) + strlen(USER_AGENT);
-		if (header_len > sizeof(m_Request.request_head))
-			return;
-		sprintf(m_Request.request_head, POST_FORMAT, m_Request.file, USER_AGENT, m_Request.referer,
-			m_Request.host, data_len, m_Request.data);
-		break;
-
-	case HTTP_HEAD:
-		header_len = strlen(m_Request.file) + strlen(m_Request.host) +
-			strlen(m_Request.referer) + (strlen(HEAD_FORMAT) - 8) + strlen(USER_AGENT);
-		if (header_len > sizeof(m_Request.request_head))
-			return;
-		sprintf(m_Request.request_head, HEAD_FORMAT, m_Request.file, USER_AGENT,
-			m_Request.referer, m_Request.host);
-		break;
-	}
-
-	if (Send(m_Request.request_head))
-		HandleEntity();
-}
-
-int CHttpClient::ProcessURL(int iType, char* szURL, char* szPostData, char* szReferer)
-{
-	InitRequest(iType, szURL, szPostData, szReferer);
-	Process();
-	return m_iError;
-}
+//----------------------------------------------------

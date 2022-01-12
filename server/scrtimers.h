@@ -17,14 +17,12 @@
 
 struct ScriptTimer_s
 {
-	int iIdx;
-	//char szScriptFunc[255];
+	char szScriptFunc[255];
 	int iTotalTime;
-	//int iRemainingTime;
-	RakNet::Time CallTime;
-	bool bRepeating;
+	int iRemainingTime;
+	BOOL bRepeating;
 	//BOOL bFilterscript;
-	bool bKilled;
+	BOOL bKilled;
 	AMX* pAMX;
 	int iParamCount;
 	//cell cellParams[16];
@@ -42,14 +40,13 @@ class CScriptTimers
 private:
 	DwordTimerMap m_Timers;
 	DWORD m_dwTimerCount;
-
 public:
 	CScriptTimers();
 	~CScriptTimers();
 	
 	void DeleteForMode(AMX* pEndedAMX);
-	DWORD New(char* szScriptFunc, int iInterval, bool bRepeating, AMX* pAMX);
-	DWORD NewEx(char* szScriptFunc, int iInterval, bool bRepeating, cell *params, AMX* pAMX);
+	DWORD New(char* szScriptFunc, int iInterval, BOOL bRepeating, AMX* pAMX);
+	DWORD NewEx(char* szScriptFunc, int iInterval, BOOL bRepeating, cell *params, AMX* pAMX);
 	void Delete(DWORD dwTimerId);
 	void Kill(DWORD dwTimerId);
 	void Process(int iElapsedTime);

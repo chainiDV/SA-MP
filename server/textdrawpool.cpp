@@ -9,13 +9,17 @@ Version: $Id: textdrawpool.cpp,v 1.0 2007/05/18 19:26:45 Y_Less Exp $
 
 #include "main.h"
 
+extern CNetGame* pNetGame;
+
+#define RGBA_ABGR(n) (((n >> 24) & 0x000000FF) | ((n >> 8) & 0x0000FF00) | ((n << 8) & 0x00FF0000) | ((n << 24) & 0xFF000000))
+
 //----------------------------------------------------
 
 CTextDrawPool::CTextDrawPool()
 {
 	for (WORD wText = 0; wText < MAX_TEXT_DRAWS; wText++)
 	{
-		m_bSlotState[wText] = false;
+		m_bSlotState[wText] = FALSE;
 		m_TextDraw[wText] = NULL;
 		m_szFontText[wText] = NULL;
 	}
@@ -59,13 +63,13 @@ WORD CTextDrawPool::New(float fX, float fY, char* szText)
 	{
 		strncpy(Text, szText, MAX_TEXT_DRAW_LINE);
 		Text[MAX_TEXT_DRAW_LINE - 1] = '\0';
-		TextDraw->fLetterWidth = 0.48f;
-		TextDraw->fLetterHeight = 1.12f;
+		TextDraw->fLetterWidth = 0.48;
+		TextDraw->fLetterHeight = 1.12;
 		TextDraw->dwLetterColor = 0xFFE1E1E1; // ABGR
 		TextDraw->byteCenter = 0;
 		TextDraw->byteBox = 0;
-		TextDraw->fLineWidth = 1280.0f;
-		TextDraw->fLineHeight = 1280.0f;
+		TextDraw->fLineWidth = 1280.0;
+		TextDraw->fLineHeight = 1280.0;
 		TextDraw->dwBoxColor = 0x80808080; // ABGR
 		TextDraw->byteProportional = 1;
 		TextDraw->dwBackgroundColor = 0xFF000000; // ABGR
@@ -78,7 +82,7 @@ WORD CTextDrawPool::New(float fX, float fY, char* szText)
 		TextDraw->fY = fY;
 		m_TextDraw[wText] = TextDraw;
 		m_szFontText[wText] = Text;
-		m_bSlotState[wText] = true;
+		m_bSlotState[wText] = TRUE;
 		return wText;
 	}
 	return 0xFFFF;
@@ -96,7 +100,7 @@ void CTextDrawPool::Delete(WORD wText)
 		free(m_szFontText[wText]);
 		m_szFontText[wText] = NULL;
 	}
-	m_bSlotState[wText] = false;
+	m_bSlotState[wText] = FALSE;
 	HideForAll(wText);
 }
 

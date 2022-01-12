@@ -14,6 +14,10 @@
 
 #include "main.h"
 
+extern bool	bQuitApp;
+
+extern CNetGame* pNetGame;
+
 void con_exit()
 {
 	bQuitApp = true;
@@ -43,7 +47,7 @@ void con_exec()
 		{
 			logprintf("Unable to exec file '%s'.", tmp);
 		} else {
-			while (fgets(tmp, sizeof(tmp), f))
+			while (fgets(tmp, 1024, f))
 			{
 				int len = strlen(tmp);
 				if (len > 0 && tmp[len-1] == '\n')
@@ -95,16 +99,16 @@ void con_kick()
 	if(arg)
 	{
 		CPlayerPool* pPlayerPool = pNetGame->GetPlayerPool();
-		WORD wPlayerId = atoi(arg);
+		BYTE bytePlayerId = atoi(arg);
 
-		if(pPlayerPool->GetSlotState(wPlayerId))
+		if(pPlayerPool->GetSlotState(bytePlayerId))
 		{
 			RakServerInterface* pRak = pNetGame->GetRakServer();
-			PlayerID Player = pRak->GetPlayerIDFromIndex(wPlayerId);
+			PlayerID Player = pRak->GetPlayerIDFromIndex(bytePlayerId);
 			in_addr in;
 			in.s_addr = Player.binaryAddress;
-			logprintf("%s <#%d - %s> has been kicked.",pPlayerPool->GetAt(wPlayerId)->GetName(), wPlayerId, inet_ntoa(in));
-			pNetGame->KickPlayer(wPlayerId);
+			logprintf("%s <#%d - %s> has been kicked.",pPlayerPool->GetPlayerName(bytePlayerId), bytePlayerId, inet_ntoa(in));
+			pNetGame->KickPlayer(bytePlayerId);
 		}
 	}
 }
@@ -115,21 +119,21 @@ void con_ban()
 	if (arg)
 	{
 		CPlayerPool* pPlayerPool = pNetGame->GetPlayerPool();
-		WORD wPlayerId = atoi(arg);
-		if (pPlayerPool->GetSlotState(wPlayerId))
+		BYTE bytePlayerId = atoi(arg);
+		if (pPlayerPool->GetSlotState(bytePlayerId))
 		{
 			RakServerInterface* pRak = pNetGame->GetRakServer();
-			PlayerID Player = pRak->GetPlayerIDFromIndex(wPlayerId);
+			PlayerID Player = pRak->GetPlayerIDFromIndex(bytePlayerId);
 			in_addr in;
 			in.s_addr = Player.binaryAddress;
-			CPlayer* pPlayer = pPlayerPool->GetAt(wPlayerId);
-			logprintf("%s <#%d - %s> has been banned.", pPlayer->GetName(), wPlayerId, inet_ntoa(in));
-			pNetGame->AddBan((char*)pPlayer->GetName(), inet_ntoa(in), "CONSOLE BAN");
-			pNetGame->KickPlayer(wPlayerId);
+			logprintf("%s <#%d - %s> has been banned.",pPlayerPool->GetPlayerName(bytePlayerId), bytePlayerId, inet_ntoa(in));
+			pNetGame->AddBan(pPlayerPool->GetPlayerName(bytePlayerId), inet_ntoa(in), "CONSOLE BAN");
+			pNetGame->KickPlayer(bytePlayerId);
 		}
 	}
 }
 
+bool IsStrIp(char* szIn);
 bool IsStrIp(char* szIn)
 {
 	char* part;
@@ -155,6 +159,7 @@ bool IsStrIp(char* szIn)
 void con_banip()
 {
 	char* arg = strtok(NULL, " ");
+	printf("arg: %s\n", arg);
 	if (arg && IsStrIp(arg))
 	{
 		logprintf("IP %s has been banned.", arg);
@@ -171,34 +176,29 @@ void con_unbanip()
 	}
 }
 
+extern BOOL bGameModeFinished;
 void con_gmx()
-{
-	if (pNetGame && pNetGame->GetGameState() == GAMESTATE_RUNNING)
+{	
+	// restart with no rotations.
+	//int tmp = pNetGame->GetRepeats;
+	// Gets the name of the next mode to avoid standard cycling
+	char *szMode;
+	szMode = pNetGame->GetNextScriptFile();
+	if (szMode != NULL && pNetGame->SetNextScriptFile(szMode))
 	{
-		// restart with no rotations.
-		//int tmp = pNetGame->GetRepeats;
-		// Gets the name of the next mode to avoid standard cycling
-		char* szMode;
-		szMode = pNetGame->GetNextScriptFile();
-		if (szMode != NULL && pNetGame->SetNextScriptFile(szMode))
-		{
-			bGameModeFinished = true;
-		}
+		bGameModeFinished = TRUE;
 	}
 }
 
 void con_changemode()
 {
-	if (pNetGame && pNetGame->GetGameState() == GAMESTATE_RUNNING)
+	char* arg = strtok(NULL, "");
+	if (arg)
 	{
-		char* arg = strtok(NULL, "");
-		if (arg)
-		{
-			if (pNetGame->SetNextScriptFile(arg)) {
-				bGameModeFinished = true;
-			}
-			// do nothing if we can't set the requested script.
+		if(pNetGame->SetNextScriptFile(arg)) {
+			bGameModeFinished = TRUE;
 		}
+		// do nothing if we can't set the requested script.
 	}
 }
 
@@ -211,9 +211,9 @@ void con_varlist()
 
 void con_say() {
 	char* arg = strtok(NULL, "");
-	char Message[256];
+	char Message[255];
 	if (arg) {
-		sprintf(Message, "* Admin: %.230s", arg);
+		sprintf(Message, "* Admin: %s", arg);
 		pNetGame->SendClientMessageToAll(0x2587CEAA, Message);
 	}
 }
@@ -238,18 +238,18 @@ void con_players() {
 
 	for( int i = 0; i < MAX_PLAYERS; i++)
 	{
-		if ( pPlayerPool->GetSlotState(i) )
+		if ( pPlayerPool->GetSlotState(i) == TRUE)
 		{
 			PlayerID Player = pRak->GetPlayerIDFromIndex(i);
 			in_addr in;
 			in.s_addr = Player.binaryAddress;
 
-			logprintf("%d\t%s\t%d\t%s", i, pPlayerPool->GetAt(i)->GetName(), pRak->GetLastPing( Player ), inet_ntoa(in));
+			logprintf("%d\t%s\t%d\t%s", i, pPlayerPool->GetPlayerName(i), pRak->GetLastPing( Player ), inet_ntoa(in));
 		}
 	}
 }
 
-/*void con_gravity()
+void con_gravity()
 {
 	char* arg = strtok(NULL, " ");
 	if (arg)
@@ -265,57 +265,57 @@ void con_weather()
 	{
 		pNetGame->SetWeather(atoi(arg));
 	}
-}*/
+}
 
 void con_loadfs()
 {
-	WORD wTemp = wRconUser;
+	BYTE byteTemp = byteRconUser;
 	// Stop sending all the filterscripts prints to the user if they used in-game RCON
-	wRconUser = INVALID_ID;
+	byteRconUser = INVALID_ID;
 	char* arg = strtok(NULL, "");
 	if (arg)
 	{
 		if(!pNetGame->GetFilterScripts()->LoadFilterScript(arg))
 		{
-			wRconUser = wTemp;
-			logprintf("  Filterscript '%s.amx' load failed.", arg);
+			byteRconUser = byteTemp;
+			logprintf("  Filter script '%s.amx' load failed.", arg);
 		}
 		else
 		{
-			wRconUser = wTemp;
-			logprintf("  Filterscript '%s.amx' loaded.", arg);
+			byteRconUser = byteTemp;
+			logprintf("  Filterscript '%s.amx' loaded.", arg);			
 		}
 	}
 }
 
 void con_reloadfs()
 {
-	WORD wTemp = wRconUser;
+	BYTE byteTemp = byteRconUser;
 	// Stop sending all the filterscripts prints to the user if they used in-game RCON
-	wRconUser = INVALID_ID;
+	byteRconUser = INVALID_ID;
 	char* arg = strtok(NULL, "");
 	if (arg)
 	{
 		if(pNetGame->GetFilterScripts()->UnloadOneFilterScript(arg))
 		{
-			wRconUser = wTemp;
-			logprintf("  Filterscript '%s.amx' unloaded.", arg);
+			byteRconUser = byteTemp;
+			logprintf("  Filter script '%s.amx' unloaded.", arg);
 		}
 		else
 		{
-			wRconUser = wTemp;
-			logprintf("  Filterscript '%s.amx' unload failed.", arg);
+			byteRconUser = byteTemp;
+			logprintf("  Filter script '%s.amx' unload failed.", arg);
 		}
 
-		wRconUser = INVALID_ID;
+		byteRconUser = INVALID_ID;
 		if(!pNetGame->GetFilterScripts()->LoadFilterScript(arg))
 		{
-			wRconUser = wTemp;
-			logprintf("  Filterscript '%s.amx' load failed'.", arg);
+			byteRconUser = byteTemp;
+			logprintf("  Filter script '%s.amx' load failed'.", arg);
 		}
 		else
 		{
-			wRconUser = wTemp;
+			byteRconUser = byteTemp;
 			logprintf("  Filterscript '%s.amx' loaded.", arg);
 		}
 	}
@@ -323,37 +323,23 @@ void con_reloadfs()
 
 void con_unloadfs()
 {
-	WORD wTemp = wRconUser;
+	BYTE byteTemp = byteRconUser;
 	// Stop sending all the filterscripts prints to the user if they used in-game RCON
-	wRconUser = INVALID_ID;
+	byteRconUser = INVALID_ID;
 	char* arg = strtok(NULL, "");
 	if (arg)
 	{
 		if(pNetGame->GetFilterScripts()->UnloadOneFilterScript(arg))
 		{
-			wRconUser = wTemp;
+			byteRconUser = byteTemp;
 			logprintf("  Filterscript '%s.amx' unloaded.", arg);
 		}
 		else
 		{
-			wRconUser = wTemp;
-			logprintf("  Filterscript '%s.amx' unload failed.", arg);
+			byteRconUser = byteTemp;
+			logprintf("  Filter script '%s.amx' unload failed.", arg);
 		}
 	}
-}
-
-static void con_clear()
-{
-#ifdef WIN32
-	DWORD mode;
-	HANDLE hnd = GetStdHandle(STD_OUTPUT_HANDLE);
-	GetConsoleMode(hnd, &mode);
-	SetConsoleMode(hnd, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
-#endif
-	printf("\033[2J\033[1;1H");
-#ifdef WIN32
-	SetConsoleMode(hnd, mode);
-#endif
 }
 
 #define CON_CMDFLAG_DEBUG		1
@@ -380,12 +366,11 @@ struct ConsoleCommand_s
 	{"players",		0,	con_players},
 	{"banip",		0,	con_banip},
 	{"unbanip",		0,	con_unbanip},
-	//{"gravity",		0,	con_gravity},
-	//{"weather",		0,	con_weather},
+	{"gravity",		0,	con_gravity},
+	{"weather",		0,	con_weather},
 	{"loadfs",		0,	con_loadfs},
 	{"unloadfs",	0,	con_unloadfs},
 	{"reloadfs",	0,	con_reloadfs},
-	{"cls", 0, con_clear},
 };
 
 void con_cmdlist()
@@ -424,9 +409,6 @@ CConsole::~CConsole()
 
 ConsoleVariable_s* CConsole::FindVariable(char* pVarName)
 {
-	if (pVarName == 0)
-		return 0;
-
 	char VarName[255];
 	strncpy(VarName, pVarName, 255);
 	strlwr(VarName);
@@ -702,13 +684,9 @@ void CConsole::Execute(char* pExecLine)
 	if (!pExecLine) return;
 
 	// Ya can't strtok on a read-only string!
-	char cpy[256];
-	memset(cpy, 0, sizeof cpy); 
+	char cpy[255];
 	strncpy(cpy, pExecLine, 255);
-	char* tmp = strtok(cpy, " ");
-	if (!tmp)
-		return;
-	char* cmd = strlwr(tmp);
+	char* cmd = strlwr(strtok(cpy, " "));
 
 	for (int i=0; i<ARRAY_SIZE(ConsoleCommands); i++)
 	{
@@ -762,29 +740,7 @@ void CConsole::Execute(char* pExecLine)
 			case CON_VARTYPE_BOOL:
 				if ((arg) && (!readonly))
 				{
-					bool bValue = true;
-					switch (arg[0])
-					{
-					case 'T': case 't':
-					case 'Y': case 'y':
-					case '1':
-						bValue = true;
-						break;
-					case 'F': case 'f':
-					case 'N': case 'n':
-					case '0':
-						bValue = false;
-						break;
-					case 'O': case 'o':
-						if (arg[1] == 'N' || arg[1] == 'n')
-							bValue = true;
-						if (arg[1] == 'F' || arg[1] == 'f')
-							bValue = false;
-						break;
-					default:
-						bValue = (atoi(arg) > 0);
-					}
-					*(bool*)ConVar->VarPtr = bValue;
+					*(bool*)ConVar->VarPtr = (atoi(arg) > 0);
 					bChangedVar = true;
 				} else {
 					logprintf("%s = %d  (bool%s)", cmd, *(bool*)ConVar->VarPtr, readonly?", read-only":"");
@@ -827,11 +783,14 @@ void CConsole::Execute(char* pExecLine)
 		return;
 	}
 
-	if (pNetGame->GetGameMode() != NULL && pNetGame->GetFilterScripts() != NULL) {
-		if (!pNetGame->GetGameMode()->OnRconCommand(pExecLine) ||
-			!pNetGame->GetFilterScripts()->OnRconCommand(pExecLine))
+	if (!pNetGame->GetFilterScripts()->OnRconCommand(pExecLine))
+	{
+		if (pNetGame->GetGameMode())
 		{
-			logprintf("Unknown command or variable:\n  %s", cmd);
+			if (!pNetGame->GetGameMode()->OnRconCommand(pExecLine))
+			{
+					logprintf("Unknown command or variable:\n  %s", cmd);
+			}
 		}
 	}
 }

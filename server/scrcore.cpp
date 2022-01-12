@@ -19,7 +19,7 @@
 
 //----------------------------------------------------------------------------------
 
-int aux_LoadProgram(AMX* amx, char* filename)
+int AMXAPI aux_LoadProgram(AMX* amx, char* filename)
 {
 	FILE* fp;
 	if ((fp = fopen(filename, "rb")) == NULL)
@@ -62,7 +62,7 @@ int aux_LoadProgram(AMX* amx, char* filename)
 
 //----------------------------------------------------------------------------------
 
-int aux_LoadProgramFromMemory(AMX* amx, char* filedata)
+int AMXAPI aux_LoadProgramFromMemory(AMX* amx, char* filedata)
 {
 	AMX_HEADER hdr;
 
@@ -97,7 +97,7 @@ int aux_LoadProgramFromMemory(AMX* amx, char* filedata)
 }
 //----------------------------------------------------------------------------------
 
-int aux_FreeProgram(AMX *amx)
+int AMXAPI aux_FreeProgram(AMX *amx)
 {
 	if (amx->base != NULL)
 	{
@@ -110,7 +110,7 @@ int aux_FreeProgram(AMX *amx)
 
 //----------------------------------------------------------------------------------
 
-char* aux_StrError(int errnum)
+char * AMXAPI aux_StrError(int errnum)
 {
 	static char *messages[] = {
 		/* AMX_ERR_NONE      */ "(none)",
@@ -170,7 +170,7 @@ int set_amxstring(AMX *amx,cell amx_addr,const char *source,int max)
   cell* dest = (cell *)(amx->base + (int)(((AMX_HEADER *)amx->base)->dat + amx_addr));
   cell* start = dest;
   while (max--&&*source)
-    *dest++=(unsigned char)*source++;
+    *dest++=(cell)*source++;
   *dest = 0;
   return dest-start;
 }
@@ -186,50 +186,3 @@ char* format_amxstring(AMX *amx, cell *params, int parm, int &len)
 }
 
 //----------------------------------------------------------------------------------
-
-void PrintMissingNatives(AMX* amx, const char* szScriptName)
-{
-	#define USENAMETABLE(hdr) \
-		((hdr)->defsize==sizeof(AMX_FUNCSTUBNT))
-	#define NUMENTRIES(hdr,field,nextfield) \
-		(unsigned)(((hdr)->nextfield - (hdr)->field) / (hdr)->defsize)
-	#define GETENTRY(hdr,table,index) \
-		(AMX_FUNCSTUB *)((unsigned char*)(hdr) + (unsigned)(hdr)->table + (unsigned)index*(hdr)->defsize)
-	#define GETENTRYNAME(hdr,entry) \
-		( USENAMETABLE(hdr) \
-			? (char *)((unsigned char*)(hdr) + (unsigned)((AMX_FUNCSTUBNT*)(entry))->nameofs) \
-			: ((AMX_FUNCSTUB*)(entry))->name )
-
-	AMX_FUNCSTUB* func;
-	AMX_HEADER* hdr;
-	int i, numnatives;
-
-	hdr = (AMX_HEADER*)amx->base;
-	assert(hdr != NULL);
-	assert(hdr->magic == AMX_MAGIC);
-	assert(hdr->natives <= hdr->libraries);
-	numnatives = NUMENTRIES(hdr, natives, libraries);
-
-	func = GETENTRY(hdr, natives, 0);
-	for (i = 0; i < numnatives; i++)
-	{
-		if (func->address == 0)
-		{
-			logprintf("Script[%s]: \"%s\" native function not found.", szScriptName, GETENTRYNAME(hdr, func));
-		}
-		func = (AMX_FUNCSTUB*)((unsigned char*)func + hdr->defsize);
-	}
-}
-
-char* GetScriptName(AMX* amx)
-{
-	CFilterScripts* pFS = pNetGame->GetFilterScripts();
-	CGameMode* pGM = pNetGame->GetGameMode();
-
-	if (pGM != NULL && pGM->GetGameModePointer() == amx)
-		return pGM->GetFileName();
-	if (pFS != NULL)
-		return pFS->GetFilterScriptName(amx);
-
-	return "";
-}

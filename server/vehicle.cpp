@@ -8,11 +8,19 @@
 */
 
 #include "main.h"
+extern CNetGame *pNetGame;
+
+#define TRAIN_PASSENGER_LOCO			537
+#define TRAIN_FREIGHT_LOCO				538
+#define TRAIN_PASSENGER					569
+#define TRAIN_FREIGHT					570
+#define TRAIN_TRAM						449
 
 //----------------------------------------------------------
 
-CVehicle::CVehicle( int iModel, VECTOR *vecPos, float fRotation, int iColor1,
- int iColor2, int iRespawnDelay, bool bAddSiren)
+CVehicle::CVehicle( int iModel, VECTOR *vecPos,
+				    float fRotation, int iColor1,
+				    int iColor2, int iRespawnDelay)
 {
 	// Store the spawn info.
 	m_SpawnInfo.iVehicleType = iModel;
@@ -20,12 +28,10 @@ CVehicle::CVehicle( int iModel, VECTOR *vecPos, float fRotation, int iColor1,
 	m_SpawnInfo.vecPos.X = vecPos->X;
 	m_SpawnInfo.vecPos.Y = vecPos->Y;
 	m_SpawnInfo.vecPos.Z = vecPos->Z;
-	m_SpawnInfo.iColor1 = (iColor1 == -1) ? (rand() % 255) : (iColor1);
-	m_SpawnInfo.iColor2 = (iColor2 == -1) ? (rand() % 255) : (iColor2);
+	m_SpawnInfo.iColor1 = iColor1;
+	m_SpawnInfo.iColor2 = iColor2;
 	m_SpawnInfo.iRespawnDelay = iRespawnDelay;
 	m_SpawnInfo.iInterior = 0;
-
-	m_bHasSiren = (VehicleModelWithSiren(iModel) || bAddSiren) ? true : false;
 
 	m_bHasBeenOccupied = false;
 	m_dwLastRespawnedTick = GetTickCount();
@@ -41,26 +47,11 @@ CVehicle::CVehicle( int iModel, VECTOR *vecPos, float fRotation, int iColor1,
 	memset(&m_CarModInfo,  0,sizeof(CAR_MOD_INFO));
 	memset(&m_szNumberPlate[0],0,sizeof(m_szNumberPlate));
 
-	m_bIsActive = true;
-	m_bIsWasted = false;
+	m_bIsActive = TRUE;
+	m_bIsWasted = FALSE;
 	m_byteDriverID = INVALID_ID;
-	m_ucKillerID = INVALID_ID;
 	m_fHealth = 1000.0f;
 	m_bDeathHasBeenNotified = false;
-	m_iVirtualWorld = 0;
-	m_Windows = { 1, 1, 1, 1 }; // Close all window 
-	m_Doors = { 0,0,0,0 }; // Close all doors
-
-	m_iPanelDamageStatus = 0;
-	m_iDoorDamageStatus = 0;
-	m_ucLightDamageStatus = 0;
-	m_ucTireDamageStatus = 0;
-
-	m_bOnItsSide = false;
-	m_bUpsideDown = false;
-	m_bSirenOn = false;
-	m_bWrecked = false;
-	m_bSunked = false;
 
 	//m_CarModInfo.iColor0 = iColor1;
 	//m_CarModInfo.iColor1 = iColor2;
@@ -68,7 +59,6 @@ CVehicle::CVehicle( int iModel, VECTOR *vecPos, float fRotation, int iColor1,
 	m_TrailerID = 0;
 	m_CabID = 0;
 	m_bDead = false;
-	bOldSirenState = false; // disabled
 }
 
 //----------------------------------------------------
@@ -100,36 +90,6 @@ void CVehicle::Update(BYTE bytePlayerID, MATRIX4X4 * matWorld, float fHealth, VE
 }
 
 //----------------------------------------------------
-// Stores and broadcast vehicle damage statuses
-
-void CVehicle::UpdateDamage(PLAYERID PlayerID, int iPanels, int iDoors, unsigned char ucLights, unsigned char ucTires)
-{
-	RakNet::BitStream bsSend;
-
-	m_iDoorDamageStatus = iDoors;
-	m_iPanelDamageStatus = iPanels;
-	m_ucLightDamageStatus = ucLights;
-	m_ucTireDamageStatus = ucTires;
-
-	bsSend.Write(m_VehicleID);
-	bsSend.Write(m_iPanelDamageStatus);
-	bsSend.Write(m_iDoorDamageStatus);
-	bsSend.Write(m_ucLightDamageStatus);
-	bsSend.Write(m_ucTireDamageStatus);
-
-	if (PlayerID != INVALID_PLAYER_ID)
-	{
-		if (pNetGame->GetFilterScripts())
-			pNetGame->GetFilterScripts()->OnVehicleDamageStatusUpdate(m_VehicleID, PlayerID);
-
-		if (pNetGame->GetGameMode())
-			pNetGame->GetGameMode()->OnVehicleDamageStatusUpdate(m_VehicleID, PlayerID);
-	}
-
-	pNetGame->BroadcastVehicleRPC(RPC_VehicleDamage, &bsSend, m_VehicleID, PlayerID);
-}
-
-//----------------------------------------------------
 // This is the method used for spawning players that
 // already exist in the world when the client connects.
 
@@ -157,11 +117,6 @@ void CVehicle::SpawnForPlayer(BYTE byteForPlayerID)
 	bsVehicleSpawn.Write(m_SpawnInfo.fRotation);
 	bsVehicleSpawn.Write(m_SpawnInfo.iInterior);
 
-	bsVehicleSpawn.Write(m_bHasSiren);
-
-	bsVehicleSpawn.WriteBits((unsigned char*)&m_Windows, 4);
-	bsVehicleSpawn.WriteBits((unsigned char*)&m_Doors, 4);
-
 	if(m_szNumberPlate[0] == '\0') {
 		bsVehicleSpawn.Write(false);
 	} else {
@@ -181,7 +136,7 @@ void CVehicle::SpawnForPlayer(BYTE byteForPlayerID)
 
 //----------------------------------------------------------
 
-bool CVehicle::IsOccupied()
+BOOL CVehicle::IsOccupied()
 {
 	CPlayer *pPlayer;
 
@@ -194,13 +149,13 @@ bool CVehicle::IsOccupied()
 			if( pPlayer && (pPlayer->m_VehicleID == m_VehicleID) &&
 				 (pPlayer->GetState() == PLAYER_STATE_DRIVER ||
 				 pPlayer->GetState() == PLAYER_STATE_PASSENGER) ) {
-					 return true;
+					 return TRUE;
 			}
 		}
 		x++;
 	}
 
-	return false;
+	return FALSE;
 }
 
 //----------------------------------------------------------
@@ -244,6 +199,8 @@ void CVehicle::CheckForIdleRespawn()
 
 void CVehicle::Process(float fElapsedTime)
 {
+	CPlayerPool* pPlayerPool = pNetGame->GetPlayerPool();
+	
 	// Check for an idle vehicle.. but don't do this
 	// every ::Process because it would be too CPU intensive.
 	if(!m_bDeathHasBeenNotified && m_SpawnInfo.iRespawnDelay != (-1) && ((rand() % 20) == 0)) {
@@ -260,11 +217,10 @@ void CVehicle::Process(float fElapsedTime)
 			m_szNumberPlate[0] = 0;
 
 			if(pNetGame->GetGameMode() && pNetGame->GetFilterScripts()) {
-				pNetGame->GetFilterScripts()->OnVehicleDeath(m_VehicleID, m_ucKillerID);
-				pNetGame->GetGameMode()->OnVehicleDeath(m_VehicleID, m_ucKillerID);
+				pNetGame->GetFilterScripts()->OnVehicleDeath(m_VehicleID, 255);
+				pNetGame->GetGameMode()->OnVehicleDeath(m_VehicleID, 255);
 			}
 			m_dwLastSeenOccupiedTick = GetTickCount();
-			m_ucKillerID = INVALID_ID;
 		}
 		if(!(rand() % 20) && GetTickCount() - m_dwLastSeenOccupiedTick > 10000)
 		{
@@ -325,43 +281,3 @@ void CVehicle::SetNumberPlate(PCHAR Plate)
 }
 
 //----------------------------------------------------------
-
-float CVehicle::GetDistanceFromPoint(float fX, float fY, float fZ)
-{
-	float
-		x = m_matWorld.pos.X - fX,
-		y = m_matWorld.pos.Y - fY,
-		z = m_matWorld.pos.Z - fZ;
-
-	return sqrtf(z * z + y * y + x * x);
-}
-
-void CVehicle::SetVirtualWorld(int iVirtualWorld)
-{
-	m_iVirtualWorld = iVirtualWorld;
-
-	RakNet::BitStream bsData;
-	bsData.Write(m_VehicleID); // player id
-	bsData.Write(iVirtualWorld); // vw id
-	pNetGame->SendToAll(RPC_ScrSetVehicleVirtualWorld, &bsData);
-
-}
-
-bool CVehicle::HandleSiren(unsigned char ucPlayerId, bool bSirenState)
-{
-	if (m_bHasSiren) {
-		if (bOldSirenState != bSirenState) {
-			CFilterScripts* pFilterScripts = pNetGame->GetFilterScripts();
-			CGameMode* pGameMode = pNetGame->GetGameMode();
-			int ret = 0;
-			if (pFilterScripts)
-				ret = pFilterScripts->OnVehicleSirenStateChange(ucPlayerId, m_VehicleID, bSirenState);
-			if (pGameMode && !ret)
-				pGameMode->OnVehicleSirenStateChange(ucPlayerId, m_VehicleID, bSirenState);
-
-			bOldSirenState = bSirenState;
-		}
-		return true;
-	}
-	return false;
-}

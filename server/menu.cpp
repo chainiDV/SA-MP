@@ -8,6 +8,7 @@ Version: $Id: menu.cpp,v 1.0 2007/02/13 15:35:32 Y_Less Exp $
 */
 
 #include "main.h"
+extern CNetGame *pNetGame;
 
 CMenu::CMenu(PCHAR pTitle, float fX, float fY, BYTE byteColumns, float fCol1Width, float fCol2Width)
 {
@@ -16,9 +17,9 @@ CMenu::CMenu(PCHAR pTitle, float fX, float fY, BYTE byteColumns, float fCol1Widt
 	{
 		m_charItems[i][0][0] = '\0';
 		m_charItems[i][1][0] = '\0';
-		m_MenuInteraction.bRow[i] = true;
+		m_MenuInteraction.bRow[i] = TRUE;
 	}
-	m_MenuInteraction.bMenu = true;
+	m_MenuInteraction.bMenu = TRUE;
 	//m_charTitle[0] = '\0';
 	m_charHeader[0][0] = '\0';
 	m_charHeader[1][0] = '\0';
@@ -42,7 +43,7 @@ void CMenu::ResetForAll()
 {
 	for (BYTE i = 0; i < MAX_PLAYERS; i++)
 	{
-		m_bInitedForPlayer[i] = false;
+		m_bInitedForPlayer[i] = FALSE;
 	}
 }
 
@@ -72,14 +73,14 @@ void CMenu::InitForPlayer(BYTE bytePlayerID)
 {
 	if (bytePlayerID >= MAX_PLAYERS) return;
 	
-	m_bInitedForPlayer[bytePlayerID] = true;
+	m_bInitedForPlayer[bytePlayerID] = TRUE;
 	
 	// Send data here
 	RakServerInterface* pRak = pNetGame->GetRakServer();
 	RakNet::BitStream bsMenu;
 	
 	bsMenu.Write(m_byteMenuID);
-	bsMenu.Write(m_byteColumns == 2);
+	bsMenu.Write((BOOL)(m_byteColumns == 2));
 	bsMenu.Write(m_charTitle, MAX_MENU_LINE);
 	bsMenu.Write(m_fXPos);
 	bsMenu.Write(m_fYPos);
@@ -137,9 +138,4 @@ void CMenu::HideForPlayer(BYTE bytePlayerID)
 	bsMenu.Write(m_byteMenuID);
 	pRak->RPC(RPC_ScrHideMenu, &bsMenu, HIGH_PRIORITY, 
 		RELIABLE, 0, pRak->GetPlayerIDFromIndex(bytePlayerID), false, false);
-}
-
-bool CMenu::ValidRow(unsigned char ucRow)
-{
-	return (ucRow < MAX_MENU_ITEMS && (m_charItems[ucRow][0][0] != 0 || m_charItems[ucRow][1][0] != 0));
 }

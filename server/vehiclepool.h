@@ -10,58 +10,49 @@
 #ifndef SAMPSRV_VEHICLEPOOL_H
 #define SAMPSRV_VEHICLEPOOL_H
 
-#define INVALID_VEHICLE (0xFFFF)
-
 //----------------------------------------------------
 
 class CVehiclePool
 {
 private:
 	
-	bool m_bVehicleSlotState[MAX_VEHICLES];
+	BOOL m_bVehicleSlotState[MAX_VEHICLES];
 	CVehicle *m_pVehicles[MAX_VEHICLES];
-	//BYTE m_byteVirtualWorld[MAX_VEHICLES];
-	int m_iLastVehicleId;
-	unsigned short m_usVehicleModelsUsed[212];
+	BYTE m_byteVirtualWorld[MAX_VEHICLES];
+
 public:
 	CVehiclePool();
 	~CVehiclePool();
 
-	VEHICLEID New(int iVehicleType, VECTOR * vecPos, float fRotation, int iColor1, int iColor2, int iRespawnDelay, bool bAddSiren);
+	VEHICLEID New(int iVehicleType, VECTOR * vecPos, float fRotation, int iColor1, int iColor2, int iRespawnDelay);
 
-	bool Delete(VEHICLEID VehicleID);	
+	BOOL Delete(VEHICLEID VehicleID);	
 		
 	// Retrieve a vehicle by id
-	CVehicle* GetAt(int iVehicleID)
+	CVehicle* GetAt(VEHICLEID VehicleID)
 	{
-		return (iVehicleID >= 0 && iVehicleID < MAX_VEHICLES) ? m_pVehicles[iVehicleID] : nullptr;
+		if(VehicleID >= MAX_VEHICLES) { return NULL; }
+		return m_pVehicles[VehicleID];
 	};
 
 	// Find out if the slot is inuse.
-	bool GetSlotState(int iVehicleID)
+	BOOL GetSlotState(VEHICLEID VehicleID)
 	{
-		return (iVehicleID >= 0 && iVehicleID < MAX_VEHICLES) ? m_bVehicleSlotState[iVehicleID] : false;
+		if(VehicleID > MAX_VEHICLES) { return FALSE; }
+		return m_bVehicleSlotState[VehicleID];
 	};
 
 	void InitForPlayer(BYTE bytePlayerID);
 
 	void Process(float fElapsedTime);
 
-	/*void SetVehicleVirtualWorld(VEHICLEID VehicleID, BYTE byteVirtualWorld);
+	void SetVehicleVirtualWorld(VEHICLEID VehicleID, BYTE byteVirtualWorld);
 	
 	BYTE GetVehicleVirtualWorld(VEHICLEID VehicleID) {
 		if (VehicleID >= MAX_VEHICLES) { return 0; }
 		return m_byteVirtualWorld[VehicleID];		
-	};*/
+	};
 
-	int GetVehicleLastId() const { return m_iLastVehicleId; }
-
-	unsigned short GetVehicleModelsUsed(int iId) const
-	{
-		return m_usVehicleModelsUsed[iId];
-	}
-
-	unsigned int GetNumberOfModels();
 };
 
 //----------------------------------------------------

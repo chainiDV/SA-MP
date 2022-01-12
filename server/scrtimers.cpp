@@ -16,6 +16,8 @@
 
 #include "main.h"
 
+extern CNetGame* pNetGame;
+
 //----------------------------------------------------------------------------------
 
 CScriptTimers::CScriptTimers()
@@ -72,32 +74,22 @@ void CScriptTimers::DeleteForMode(AMX* pEndedAMX)
 
 //----------------------------------------------------------------------------------
 
-DWORD CScriptTimers::New(char* szScriptFunc, int iInterval, bool bRepeating, AMX* pAMX)
+DWORD CScriptTimers::New(char* szScriptFunc, int iInterval, BOOL bRepeating, AMX* pAMX)
 {
-	int idx;
-
-	if (amx_FindPublic(pAMX, szScriptFunc, &idx) != AMX_ERR_NONE)
-	{
-		return 0;
-	}
-
 	m_dwTimerCount++;
 
 	ScriptTimer_s* NewTimer = new ScriptTimer_s;
 
-	if(iInterval < 500) iInterval = 500;
+	//if(iInterval < 500) iInterval = 500;
 
-	//strncpy(NewTimer->szScriptFunc, szScriptFunc, 255);
+	strncpy(NewTimer->szScriptFunc, szScriptFunc, 255);
 	NewTimer->iTotalTime = iInterval;
-	//NewTimer->iRemainingTime = iInterval;
+	NewTimer->iRemainingTime = iInterval;
 	NewTimer->bRepeating = bRepeating;
 	NewTimer->iParamCount = 0;
 	NewTimer->bKilled = false;
 	NewTimer->pAMX = pAMX;
 	NewTimer->cellParams = NULL;
-	NewTimer->iIdx = idx;
-	NewTimer->CallTime = RakNet::GetTime() + iInterval;
-
 	// Checks if it's called from a filterscript, if not, mark it for destruction at gamemode end
 	/*if (pAMX == pNetGame->GetGameMode()->GetGameModePointer())
 	{
@@ -116,30 +108,19 @@ DWORD CScriptTimers::New(char* szScriptFunc, int iInterval, bool bRepeating, AMX
 //----------------------------------------------------------------------------------
 // Same as new only with parameters to be passed to the called function
 cell* get_amxaddr(AMX *amx, cell amx_addr);
-DWORD CScriptTimers::NewEx(char* szScriptFunc, int iInterval, bool bRepeating, cell *params, AMX* pAMX)
+DWORD CScriptTimers::NewEx(char* szScriptFunc, int iInterval, BOOL bRepeating, cell *params, AMX* pAMX)
 {
-	int idx;
-
-	if (amx_FindPublic(pAMX, szScriptFunc, &idx) != AMX_ERR_NONE)
-	{
-		return 0;
-	}
-
 	m_dwTimerCount++;
 
 	ScriptTimer_s* NewTimer = new ScriptTimer_s;
 
-	if (iInterval < 500) iInterval = 500;
-
-	//strncpy(NewTimer->szScriptFunc, szScriptFunc, 255);
+	strncpy(NewTimer->szScriptFunc, szScriptFunc, 255);
 	NewTimer->iTotalTime = iInterval;
-	//NewTimer->iRemainingTime = iInterval;
+	NewTimer->iRemainingTime = iInterval;
 	NewTimer->bRepeating = bRepeating;
 	NewTimer->bKilled = false;
 	NewTimer->pAMX = pAMX;
-	NewTimer->iIdx = idx;
-	NewTimer->CallTime = RakNet::GetTime() + iInterval;
-
+	
 	cell amx_addr[256];
 	
 	char* szParamList;
@@ -233,7 +214,7 @@ void CScriptTimers::Kill(DWORD dwTimerId)
 	{
 		//SAFE_DELETE(itor->second);
 		//m_Timers.erase(itor);
-		//itor->second->iRemainingTime = 0;
+		itor->second->iRemainingTime = 0;
 		itor->second->bKilled = true;
 		itor->second->bRepeating = false;
 		//Delete(itor->first);
@@ -245,24 +226,22 @@ void CScriptTimers::Kill(DWORD dwTimerId)
 //int AMXAPI amx_Push(AMX *amx, cell value);
 void CScriptTimers::Process(int iElapsedTime)
 {
-	RakNet::Time TimeNow = RakNet::GetTime();
 	DwordTimerMap::iterator itor;
-	//CGameMode *pGameMode;
+	CGameMode *pGameMode;
 	for (itor = m_Timers.begin(); itor != m_Timers.end(); itor++)
 	{
-		//itor->second->iRemainingTime -= (TimeNow - m_LastProcessTime);
-		//if (itor->second->iRemainingTime <= 0)
-		if(itor->second->CallTime <= TimeNow)
+		itor->second->iRemainingTime -= iElapsedTime;
+		if (itor->second->iRemainingTime <= 0)
 		{
 			DwordTimerMap::iterator itor_tmp = ++itor; itor--;
 			if (!itor->second->bKilled)
 			{
-				//pGameMode = pNetGame->GetGameMode();
-				//if (pGameMode)
+				pGameMode = pNetGame->GetGameMode();
+				if (pGameMode)
 				{
-					int idx = itor->second->iIdx;
+					int idx;
 					AMX* amx = itor->second->pAMX;
-					if (amx /*&& !amx_FindPublic(amx, itor->second->szScriptFunc, &idx)*/)
+					if (amx && !amx_FindPublic(amx, itor->second->szScriptFunc, &idx))
 					{
 						cell ret;
 						//cell releases[16];
@@ -293,8 +272,7 @@ void CScriptTimers::Process(int iElapsedTime)
 	
 			if (itor->second->bRepeating)
 			{
-				//itor->second->iRemainingTime = itor->second->iTotalTime;
-				itor->second->CallTime = TimeNow + itor->second->iTotalTime;
+				itor->second->iRemainingTime = itor->second->iTotalTime;
 			}
 			else
 			{

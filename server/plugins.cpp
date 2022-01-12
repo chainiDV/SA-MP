@@ -6,19 +6,15 @@
 //----------------------------------------------------------
 
 #include "main.h"
-//#include "plugins.h"
-//#include "signer.h"
-//#include "jenkinshash.h"
-//#include "pluginkey.h"
-//#include "console.h"
+#include "plugins.h"
+#include "signer.h"
+#include "jenkinshash.h"
+#include "pluginkey.h"
+#include "console.h"
 
-// TODO: Place plugins here which will not be compatible with SAMPC
-static const char* g_szBlacklist[] = {
-	"pawnraknet",
-	"pawncmd",
-	"sky",
-	"ysf",
-};
+//---------------------------------------
+
+void logprintf(char* format, ...);
 
 //---------------------------------------
 // Some Helpers
@@ -163,7 +159,7 @@ CPlugins::~CPlugins()
 
 //---------------------------------------
 
-/*void CPlugins::ConvertFromHex(unsigned char* pbBuffer, char* szData, unsigned int dwMaxLength)
+void CPlugins::ConvertFromHex(unsigned char* pbBuffer, char* szData, unsigned int dwMaxLength)
 {
 	unsigned int i=0, dwTemp=0;
 	char szTemp[4] = {0,0,0,0};
@@ -271,11 +267,11 @@ bool CPlugins::IsValidForNoSign(char* szFilename)
 	delete[] szLCNoSign;
 
 	return false;
-}*/
+}
 
 //---------------------------------------
 	
-bool CPlugins::LoadSinglePlugin(char *szPluginPath) 
+BOOL CPlugins::LoadSinglePlugin(char *szPluginPath) 
 {
 	// Verify the plugin
 	/*
@@ -305,7 +301,7 @@ bool CPlugins::LoadSinglePlugin(char *szPluginPath)
 	{
 		// Failed to load
 		delete pSPlugin;
-		return false;
+		return FALSE;
 	}
 
 	pSPlugin->Load = (ServerPluginLoad_t)PLUGIN_GETFUNCTION(pSPlugin->hModule, "Load");
@@ -318,7 +314,7 @@ bool CPlugins::LoadSinglePlugin(char *szPluginPath)
 		logprintf("  Plugin does not conform to architecture.");
 		PLUGIN_UNLOAD(pSPlugin->hModule);
 		delete pSPlugin;
-		return false;
+		return FALSE;
 	}
 
 	pSPlugin->dwSupportFlags = (SUPPORTS_FLAGS)pSPlugin->Supports();
@@ -329,7 +325,7 @@ bool CPlugins::LoadSinglePlugin(char *szPluginPath)
 		logprintf("  Unsupported version - This plugin requires version %x.", (pSPlugin->dwSupportFlags & SUPPORTS_VERSION_MASK));
 		PLUGIN_UNLOAD(pSPlugin->hModule);
 		delete pSPlugin;
-		return false;
+		return FALSE;
 	}
 
 	if ((pSPlugin->dwSupportFlags & SUPPORTS_AMX_NATIVES) != 0) 
@@ -357,18 +353,18 @@ bool CPlugins::LoadSinglePlugin(char *szPluginPath)
 		// Initialize failed!
 		PLUGIN_UNLOAD(pSPlugin->hModule);
 		delete pSPlugin;
-		return false;
+		return FALSE;
 	}
 
 	m_Plugins.push_back(pSPlugin);
 
-	return true;
+	return TRUE;
 
 }
 
 //---------------------------------------
 
-/*void CPlugins::LoadPlugins(char *szSearchPath)
+void CPlugins::LoadPlugins(char *szSearchPath)
 {
 	char szPath[MAX_PATH];
 	char szFullPath[MAX_PATH];
@@ -415,63 +411,10 @@ bool CPlugins::LoadSinglePlugin(char *szPluginPath)
 		szFilename = strtok(NULL, " ");
 	}
 	logprintf(" Loaded %d plugins.\n", GetPluginCount());
-}*/
-
-void CPlugins::LoadPlugins(std::string strPath)
-{
-#ifdef WIN32
-	if (strPath.back() != '\\')
-		strPath += '\\';
-#else
-	if (strPath.back() != '/')
-		strPath += '/';
-#endif
-
-	logprintf("\nServer Plugins");
-	logprintf("--------------");
-
-	unsigned int uiPluginCount = 0;
-	char* szPlugins = pConsole->GetStringVariable("plugins");
-	if (szPlugins)
-	{
-		std::istringstream issPlugins(szPlugins);
-		std::string strPlugin;
-		while (std::getline(issPlugins, strPlugin, ' '))
-		{
-			logprintf(" Loading plugin: %s", strPlugin.c_str());
-
-			for (unsigned char i = 0; i < sizeof(g_szBlacklist) / sizeof(char*); i++) {
-				if (stricmp(strPlugin.c_str(), g_szBlacklist[i]) == 0) {
-					logprintf("  Blacklisted - Loading this plugin will cause a server crash.");
-					continue;
-				}
-			}
-
-			std::string strFullPath;
-			strFullPath = strPath + strPlugin;
-			if (LoadSinglePlugin((char*)strFullPath.c_str()))
-			{
-				logprintf("  Loaded.");
-				uiPluginCount++;
-			}
-			else
-			{
-#ifdef WIN32
-				logprintf("  Failed. (Error code: %d)", GetLastError());
-#else
-				char* szDLError = 0;
-				szDLError = PLUGIN_GETERROR();
-				logprintf((szDLError) ? ("  Failed. (%s)") : ("  Failed."), szDLError);
-#endif
-			}
-		}
-	}
-
-	logprintf(" Loaded %d plugins.\n", uiPluginCount);
 }
 
 // [OBSOLETE: Using the non search defined method]
-/*void CPlugins::LoadPluginsSearch(char *szSearchPath)
+void CPlugins::LoadPluginsSearch(char *szSearchPath)
 {
 #ifdef LINUX
 	DIR *dir = opendir(szSearchPath);
@@ -562,14 +505,14 @@ void CPlugins::LoadPlugins(std::string strPath)
 	}
 	FindClose(hFindFile);
 #endif
-}*/
+}
 
 //---------------------------------------
 	
-/*DWORD CPlugins::GetPluginCount()
+DWORD CPlugins::GetPluginCount()
 {
 	return (DWORD)m_Plugins.size();
-}*/
+}
 
 //---------------------------------------
 

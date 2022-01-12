@@ -16,7 +16,30 @@
 
 #define CHECK_INIT() { if (!m_bInitialised) return 0; };
 
+extern "C" int amx_CoreInit(AMX* amx);
+extern "C" int amx_CoreCleanup(AMX* amx);
+extern "C" int amx_FloatInit(AMX* amx);
+extern "C" int amx_FloatCleanup(AMX* amx);
+extern "C" int amx_StringInit(AMX* amx);
+extern "C" int amx_StringCleanup(AMX* amx);
+extern "C" int amx_FileInit(AMX* amx);
+extern "C" int amx_FileCleanup(AMX* amx);
+extern "C" int amx_TimeInit(AMX* amx);
+extern "C" int amx_TimeCleanup(AMX* amx);
+extern "C" int amx_DGramInit(AMX* amx);
+extern "C" int amx_DGramCleanup(AMX* amx);
+extern "C" int amx_sampDbInit(AMX *amx);
+extern "C" int amx_sampDbCleanup(AMX *amx);
+
+int AMXAPI aux_LoadProgram(AMX* amx, char* filename);
+int AMXAPI aux_FreeProgram(AMX *amx);
+char * AMXAPI aux_StrError(int errnum);
+void AMXPrintError(CGameMode* pGameMode, AMX *amx, int error);
+int amx_CustomInit(AMX *amx);
+
 char szGameModeFileName[256];
+
+extern CNetGame* pNetGame;
  
 //----------------------------------------------------------------------------------
 
@@ -41,7 +64,7 @@ CGameMode::~CGameMode()
 }
 
 //----------------------------------------------------------------------------------
-void PrintMissingNatives(AMX* amx, const char* szScriptName);
+
 bool CGameMode::Load(char* pFileName)
 {
 	if (m_bInitialised)
@@ -68,12 +91,11 @@ bool CGameMode::Load(char* pFileName)
 	amx_StringInit(&m_amx);
 	amx_FileInit(&m_amx);
 	amx_TimeInit(&m_amx);
+	//amx_DGramInit(&m_amx);
 	amx_CustomInit(&m_amx);
 	amx_sampDbInit(&m_amx);
 
 	pPlugins->DoAmxLoad(&m_amx);
-
-	PrintMissingNatives(&m_amx, pFileName);
 
 	m_bInitialised = true;
 
@@ -119,6 +141,7 @@ void CGameMode::Unload()
 		aux_FreeProgram(&m_amx);
 		pPlugins->DoAmxUnload(&m_amx);
 		amx_sampDbCleanup(&m_amx);
+		//amx_DGramCleanup(&m_amx);
 		amx_TimeCleanup(&m_amx);
 		amx_FileCleanup(&m_amx);
 		amx_StringCleanup(&m_amx);
@@ -310,8 +333,65 @@ int CGameMode::OnPlayerText(cell playerid, unsigned char * szText)
 		amx_Release(&m_amx, amx_addr);
 	}
 
-	if (ret && pNetGame->GetPlayerPool()->GetSlotState(playerid)) {
-		pNetGame->GetPlayerPool()->GetAt(playerid)->Say(szText, strlen((char*)szText));
+	if (ret && pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid)) {
+		pNetGame->GetPlayerPool()->GetAt((BYTE)playerid)->Say(szText, strlen((char*)szText));
+	}
+
+	return (int)ret;
+}
+
+//----------------------------------------------------------------------------------
+
+// forward OnPlayerPrivmsg(playerid, toplayerid, text[]);
+int CGameMode::OnPlayerPrivmsg(cell playerid, cell toplayerid, unsigned char * szText)
+{
+	CHECK_INIT();
+
+	int idx;
+	cell ret = 1;	// DEFAULT TO 1!
+	int orig_strlen = strlen((char*)szText) + 1;
+
+	if (!amx_FindPublic(&m_amx, "OnPlayerPrivmsg", &idx))
+	{
+		cell amx_addr, *phys_addr;
+		amx_PushString(&m_amx, &amx_addr, &phys_addr, (char*)szText, 0, 0);
+		amx_Push(&m_amx, toplayerid);
+		amx_Push(&m_amx, playerid);
+		amx_Exec(&m_amx, &ret, idx);
+		amx_GetString((char*)szText, phys_addr, 0, orig_strlen);
+		amx_Release(&m_amx, amx_addr);
+	}
+
+	if (ret && pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid)) {
+		pNetGame->GetPlayerPool()->GetAt((BYTE)playerid)->Privmsg((BYTE)toplayerid, szText, strlen((char*)szText));
+	}
+
+	return (int)ret;
+}
+
+//----------------------------------------------------------------------------------
+
+// forward OnPlayerTeamPrivmsg(playerid, text[]);
+int CGameMode::OnPlayerTeamPrivmsg(cell playerid, unsigned char * szText)
+{
+	CHECK_INIT();
+
+	int idx;
+	cell ret = 1;	// DEFAULT TO 1!
+	int orig_strlen = strlen((char*)szText) + 1;
+
+	if (!amx_FindPublic(&m_amx, "OnPlayerTeamPrivmsg", &idx))
+	{
+		cell amx_addr, *phys_addr;
+		amx_PushString(&m_amx, &amx_addr, &phys_addr, (char*)szText, 0, 0);
+		amx_Push(&m_amx, playerid);
+		amx_Exec(&m_amx, &ret, idx);
+		amx_GetString((char*)szText, phys_addr, 0, orig_strlen);
+		amx_Release(&m_amx, amx_addr);
+	}
+
+	if (ret && pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid)) {
+		pNetGame->GetPlayerPool()->GetAt((BYTE)playerid)->TeamPrivmsg(szText, strlen((char*)szText));
 	}
 
 	return (int)ret;
@@ -328,7 +408,7 @@ int CGameMode::OnPlayerCommandText(cell playerid, unsigned char * szCommandText)
 	cell ret = 0;
 	int orig_strlen = strlen((char*)szCommandText);
 
-	if(!pNetGame->GetPlayerPool()->GetSlotState(playerid))
+	if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
 		return (int)ret;
 
 	if (!amx_FindPublic(&m_amx, "OnPlayerCommandText", &idx))
@@ -371,8 +451,8 @@ int CGameMode::OnPlayerRequestClass(cell playerid, cell classid)
 	int idx;
 	cell ret = 1;	// DEFAULT TO 1!
 	
-	//if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
-		//return (int)ret;
+	if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
+		return (int)ret;
 
 	if (!amx_FindPublic(&m_amx, "OnPlayerRequestClass", &idx))
 	{
@@ -393,8 +473,8 @@ int CGameMode::OnPlayerRequestSpawn(cell playerid)
 	int idx;
 	cell ret = 1;	// DEFAULT TO 1!
 
-	//if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
-		//return (int)ret;
+	if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
+		return (int)ret;
 
 	if (!amx_FindPublic(&m_amx, "OnPlayerRequestSpawn", &idx))
 	{
@@ -414,8 +494,8 @@ int CGameMode::OnPlayerEnterVehicle(cell playerid, cell vehicleid, cell ispassen
 	int idx;
 	cell ret = 0;
 
-	//if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
-		//return (int)ret;
+	if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
+		return (int)ret;
 
 	if (!amx_FindPublic(&m_amx, "OnPlayerEnterVehicle", &idx))
 	{
@@ -437,8 +517,8 @@ int CGameMode::OnPlayerExitVehicle(cell playerid, cell vehicleid)
 	int idx;
 	cell ret = 0;
 	
-	//if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
-		//return (int)ret;
+	if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
+		return (int)ret;
 
 	if (!amx_FindPublic(&m_amx, "OnPlayerExitVehicle", &idx))
 	{
@@ -459,8 +539,8 @@ int CGameMode::OnPlayerStateChange(cell playerid, cell newstate, cell oldstate)
 	int idx;
 	cell ret = 0;
 	
-	//if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
-		//return (int)ret;
+	if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
+		return (int)ret;
 
 	if (!amx_FindPublic(&m_amx, "OnPlayerStateChange", &idx))
 	{
@@ -482,8 +562,8 @@ int CGameMode::OnPlayerInteriorChange(cell playerid, cell newid, cell oldid)
 	int idx;
 	cell ret = 0;
 	
-	//if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
-		//return (int)ret;
+	if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
+		return (int)ret;
 
 	if (!amx_FindPublic(&m_amx, "OnPlayerInteriorChange", &idx))
 	{
@@ -505,8 +585,8 @@ int CGameMode::OnPlayerEnterCheckpoint(cell playerid)
 	int idx;
 	cell ret = 0;
 	
-	//if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
-		//return (int)ret;
+	if(!pNetGame->GetPlayerPool()->GetSlotState((BYTE)playerid))
+		return (int)ret;
 
 	if (!amx_FindPublic(&m_amx, "OnPlayerEnterCheckpoint", &idx))
 	{
@@ -744,24 +824,10 @@ int CGameMode::OnVehicleMod(cell playerid, cell vehicleid, cell componentid)
 	return (int)ret;
 }
 
-// forward OnEnterExitModShop(playerid, enterexit, interiorid);
-int CGameMode::OnEnterExitModShop(cell playerid, cell enterexit, cell interiorid)
-{
-	CHECK_INIT();
-	int idx;
-	cell ret = 1;
-
-	if (!amx_FindPublic(&m_amx, "OnEnterExitModShop", &idx))
-	{
-		amx_Push(&m_amx, interiorid);
-		amx_Push(&m_amx, enterexit);
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, &ret, idx);
-	}
-	return (int)ret;
-}
+//----------------------------------------------------------------------------------
 
 // forward OnVehiclePaintjob(playerid, vehicleid, paintjobid);
+
 int CGameMode::OnVehiclePaintjob(cell playerid, cell vehicleid, cell paintjobid)
 {
 	CHECK_INIT();
@@ -796,218 +862,3 @@ int CGameMode::OnPlayerUpdate(cell playerid)
 }
 
 //----------------------------------------------------------------------------------
-
-int CGameMode::OnIncomingConnection(cell playerid, char* ip, cell port)
-{
-	CHECK_INIT();
-	int idx = 0;
-	cell ret = 1;
-	if (!amx_FindPublic(&m_amx, "OnIncomingConnection", &idx))
-	{
-		cell amx_addr, * phys_addr;
-		amx_Push(&m_amx, port);
-		amx_PushString(&m_amx, &amx_addr, &phys_addr, ip, 0, 0);
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, &ret, idx);
-		amx_Release(&m_amx, amx_addr);
-	}
-	return (int)ret;
-}
-
-int CGameMode::OnPlayerClickMap(cell playerid, float fX, float fY, float fZ)
-{
-	CHECK_INIT();
-
-	int idx = 0;
-	cell ret = 1;
-	if (!amx_FindPublic(&m_amx, "OnPlayerClickMap", &idx))
-	{
-		amx_Push(&m_amx, amx_ftoc(fZ));
-		amx_Push(&m_amx, amx_ftoc(fY));
-		amx_Push(&m_amx, amx_ftoc(fX));
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, &ret, idx);
-	}
-	return (int)ret;
-}
-
-int CGameMode::OnTrailerUpdate(cell playerid, cell vehicleid)
-{
-	CHECK_INIT();
-
-	int idx = 0;
-	cell ret = 1;
-	if (!amx_FindPublic(&m_amx, "OnTrailerUpdate", &idx))
-	{
-		amx_Push(&m_amx, vehicleid);
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, &ret, idx);
-	}
-	return (int)ret;
-}
-
-int CGameMode::OnRconLoginAttempt(char* szIP, char* szPassword, cell success)
-{
-	CHECK_INIT();
-	int idx = 0;
-	cell ret = 1;
-	if (!amx_FindPublic(&m_amx, "OnRconLoginAttempt", &idx))
-	{
-		cell amx_addr1, amx_addr2, *phys_addr;
-		amx_Push(&m_amx, success);
-		amx_PushString(&m_amx, &amx_addr2, &phys_addr, szPassword, 0, 0);
-		amx_PushString(&m_amx, &amx_addr1, &phys_addr, szIP, 0, 0);
-		amx_Exec(&m_amx, &ret, idx);
-		amx_Release(&m_amx, amx_addr1);
-		amx_Release(&m_amx, amx_addr2);
-	}
-	return (int)ret;
-}
-
-void CGameMode::OnPlayerBeginTyping(cell playerid)
-{
-	if (!m_bInitialised)
-		return;
-
-	int idx = 0;
-	if (!amx_FindPublic(&m_amx, "OnPlayerBeginTyping", &idx))
-	{
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, NULL, idx);
-	}
-}
-
-void CGameMode::OnPlayerEndTyping(cell playerid)
-{
-	if (!m_bInitialised)
-		return;
-
-	int idx = 0;
-	if (!amx_FindPublic(&m_amx, "OnPlayerEndTyping", &idx))
-	{
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, NULL, idx);
-	}
-}
-
-int CGameMode::OnPlayerStunt(cell playerid, cell vehicleid)
-{
-	CHECK_INIT();
-	int idx = 0;
-	if (!amx_FindPublic(&m_amx, "OnPlayerStunt", &idx))
-	{
-		amx_Push(&m_amx, vehicleid);
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, NULL, idx);
-	}
-	return 1;
-}
-
-void CGameMode::OnClientCheckResponse(cell playerid, cell type, cell address, cell checksum)
-{
-	int idx = 0;
-
-	if (!m_bInitialised)
-		return;
-
-	if (!amx_FindPublic(&m_amx, "OnClientCheckResponse", &idx))
-	{
-		amx_Push(&m_amx, checksum);
-		amx_Push(&m_amx, address);
-		amx_Push(&m_amx, type);
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, NULL, idx);
-	}
-}
-
-void CGameMode::OnVehicleSirenStateChange(cell playerid, cell vehicleid, cell newstate)
-{
-	int idx = 0;
-
-	if (!m_bInitialised)
-		return;
-
-	if (!amx_FindPublic(&m_amx, "OnVehicleSirenStateChange", &idx)) {
-		amx_Push(&m_amx, newstate);
-		amx_Push(&m_amx, vehicleid);
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, NULL, idx);
-	}
-}
-
-void CGameMode::OnVehicleDamageStatusUpdate(cell vehicleid, cell playerid)
-{
-	int idx = 0;
-
-	if (!m_bInitialised)
-		return;
-
-	if (!amx_FindPublic(&m_amx, "OnVehicleDamageStatusUpdate", &idx)) {
-		amx_Push(&m_amx, playerid);
-		amx_Push(&m_amx, vehicleid);
-		amx_Exec(&m_amx, NULL, idx);
-	}
-}
-
-void CGameMode::OnActorStreamIn(cell actorid, cell forplayerid)
-{
-	int idx = 0;
-
-	if (!m_bInitialised)
-		return;
-
-	if (!amx_FindPublic(&m_amx, "OnActorStreamIn", &idx))
-	{
-		amx_Push(&m_amx, forplayerid);
-		amx_Push(&m_amx, actorid);
-		amx_Exec(&m_amx, NULL, idx);
-	}
-}
-
-void CGameMode::OnActorStreamOut(cell actorid, cell forplayerid)
-{
-	int idx = 0;
-
-	if (!m_bInitialised)
-		return;
-
-	if (!amx_FindPublic(&m_amx, "OnActorStreamOut", &idx))
-	{
-		amx_Push(&m_amx, forplayerid);
-		amx_Push(&m_amx, actorid);
-		amx_Exec(&m_amx, NULL, idx);
-	}
-}
-
-void CGameMode::OnPlayerGiveDamageActor(cell playerid, cell actorid,
-	float fDamage, cell weaponid, cell bodypart)
-{
-	int idx;
-
-	if (amx_FindPublic(&m_amx, "OnPlayerGiveDamageActor", &idx) == AMX_ERR_NONE)
-	{
-		amx_Push(&m_amx, bodypart);
-		amx_Push(&m_amx, weaponid);
-		amx_Push(&m_amx, amx_ftoc(fDamage));
-		amx_Push(&m_amx, actorid);
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, NULL, idx);
-	}
-}
-
-void CGameMode::OnPlayerClickPlayer(cell playerid, cell clickedplayerid, cell source)
-{
-	int idx = 0;
-
-	if (!m_bInitialised)
-		return;
-
-	if (!amx_FindPublic(&m_amx, "OnPlayerClickPlayer", &idx))
-	{
-		amx_Push(&m_amx, source);
-		amx_Push(&m_amx, clickedplayerid);
-		amx_Push(&m_amx, playerid);
-		amx_Exec(&m_amx, NULL, idx);
-	}
-}
-

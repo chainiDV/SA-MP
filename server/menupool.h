@@ -17,7 +17,7 @@ class CMenuPool
 private:
 
 	CMenu *m_pMenus[MAX_MENUS];
-	bool m_bMenuSlotState[MAX_MENUS];
+	BOOL m_bMenuSlotState[MAX_MENUS];
 	BYTE m_bytePlayerMenu[MAX_PLAYERS];
 
 public:
@@ -26,18 +26,20 @@ public:
 
 	BYTE New(PCHAR pTitle, float fX, float fY, BYTE byteColumns, float fCol1Width, float fCol2Width);
 	
-	bool Delete(BYTE byteMenuID);
+	BOOL Delete(BYTE byteMenuID);
 	
 	// Retrieve a menu by id
-	CMenu* GetAt(int iMenuID)
+	CMenu* GetAt(BYTE byteMenuID)
 	{
-		return (iMenuID >= 0 && iMenuID < MAX_MENUS) ? m_pMenus[iMenuID] : nullptr;
+		if(byteMenuID > MAX_MENUS) { return NULL; }
+		return m_pMenus[byteMenuID];
 	};
-
+	
 	// Find out if the slot is inuse.
-	bool GetSlotState(int iMenuID)
+	BOOL GetSlotState(BYTE byteMenuID)
 	{
-		return (iMenuID >= 0 && iMenuID < MAX_MENUS) ? m_bMenuSlotState[iMenuID] : false;
+		if(byteMenuID > MAX_MENUS) { return FALSE; }
+		return m_bMenuSlotState[byteMenuID];
 	};
 	
 	void ResetPlayer(BYTE bytePlayerID)
@@ -47,19 +49,13 @@ public:
 	
 	BYTE GetPlayerMenu(BYTE bytePlayer)
 	{
-		if (bytePlayer >= MAX_PLAYERS) return INVALID_MENU_ID;
+		if (bytePlayer >= MAX_PLAYERS) return 255;
 		return m_bytePlayerMenu[bytePlayer];
 	}
 	
 	void SetPlayerMenu(BYTE bytePlayer, BYTE byteMenu)
 	{
 		if (bytePlayer < MAX_PLAYERS && byteMenu < MAX_MENUS) m_bytePlayerMenu[bytePlayer] = byteMenu;
-	}
-
-	void ResetForPlayer(BYTE bytePlayer)
-	{
-		if (bytePlayer < MAX_PLAYERS)
-			m_bytePlayerMenu[bytePlayer] = INVALID_MENU_ID;
 	}
 };
 

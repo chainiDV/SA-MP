@@ -32,8 +32,6 @@ public:
 	bool UnloadOneFilterScript(char* pFilterScript);
 	void RemoveFilterScript(int iIndex);
 	void UnloadFilterScripts();
-	char* GetFilterScriptName(AMX* amx);
-
 	void Frame(float fElapsedTime);
 	
 	AMX* GetFilterScript(DWORD dwIndex) { return m_pFilterScripts[dwIndex]; };
@@ -49,6 +47,8 @@ public:
 	int OnVehicleSpawn(cell vehicleid);
 	int OnVehicleDeath(cell vehicleid, cell killerid);
 	int OnPlayerText(cell playerid, unsigned char * szText);
+	int OnPlayerPrivmsg(cell playerid, cell toplayerid, unsigned char * szText);
+	int OnPlayerTeamPrivmsg(cell playerid, unsigned char * szText);
 	int OnPlayerCommandText(cell playerid, unsigned char * szCommandText);
 	int OnPlayerInfoChange(cell playerid);
 	int OnPlayerRequestClass(cell playerid, cell classid);
@@ -68,25 +68,10 @@ public:
 	int OnPlayerSelectedMenuRow(cell playerid, cell row);
 	int OnVehicleRespray(cell playerid, cell vehicleid, cell color1, cell color2);
 	int OnVehicleMod(cell playerid, cell vehicleid, cell componentid);
-	int OnEnterExitModShop(cell playerid, cell enterexit, cell interiorid);
 	int OnVehiclePaintjob(cell playerid, cell vehicleid, cell paintjobid);
 	int OnPlayerInteriorChange(cell playerid, cell newid, cell oldid);
 	int OnPlayerKeyStateChange(cell playerid, cell newkeys, cell oldkeys);
 	int OnPlayerUpdate(cell playerid);
-	int OnIncomingConnection(cell playerid, const char* ip, cell port);
-	int OnPlayerClickMap(cell playerid, float fX, float fY, float fZ);
-	int OnTrailerUpdate(cell playerid, cell vehicleid);
-	int OnRconLoginAttempt(char* szIP, char* szPassword, cell success);
-	void OnPlayerBeginTyping(cell playerid);
-	void OnPlayerEndTyping(cell playerid);
-	int OnPlayerStunt(cell playerid, cell vehicleid);
-	void OnClientCheckResponse(cell playerid, cell type, cell address, cell checksum);
-	int OnVehicleSirenStateChange(cell playerid, cell vehicleid, cell newstate);
-	void OnVehicleDamageStatusUpdate(cell vehicleid, cell playerid);
-	void OnActorStreamIn(cell actorid, cell forplayerid);
-	void OnActorStreamOut(cell actorid, cell forplayerid);
-	void OnPlayerGiveDamageActor(cell playerid, cell actorid, float fDamage, cell weaponid, cell bodypart);
-	void OnPlayerClickPlayer(cell playerid, cell clickedplayerid, cell source);
 };
 
 //----------------------------------------------------------------------------------

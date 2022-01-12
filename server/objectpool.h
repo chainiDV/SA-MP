@@ -16,49 +16,52 @@ class CObjectPool
 {
 private:
 
-	bool m_bObjectSlotState[MAX_OBJECTS];
+	BOOL m_bObjectSlotState[MAX_OBJECTS];
 	CObject *m_pObjects[MAX_OBJECTS];
 	
-	bool m_bPlayerObjectSlotState[MAX_PLAYERS][MAX_OBJECTS];
-	bool m_bPlayersObject[MAX_OBJECTS];
+	BOOL m_bPlayerObjectSlotState[MAX_PLAYERS][MAX_OBJECTS];
+	BOOL m_bPlayersObject[MAX_OBJECTS];
 	CObject *m_pPlayerObjects[MAX_PLAYERS][MAX_OBJECTS];
 public:
 	CObjectPool();
 	~CObjectPool();
 
-	BYTE New(int iModel, VECTOR * vecPos, VECTOR * vecRot, float fDrawDist);
-	BYTE New(int iPlayer, int iModel, VECTOR* vecPos, VECTOR* vecRot, float fDrawDist);
+	BYTE New(int iModel, VECTOR * vecPos, VECTOR * vecRot);
+	BYTE New(int iPlayer, int iModel, VECTOR* vecPos, VECTOR* vecRot);
 	
-	bool Delete(BYTE byteObjectID);	
-	bool DeleteForPlayer(BYTE bytePlayerID, BYTE byteObjectID);
+	BOOL Delete(BYTE byteObjectID);	
+	BOOL DeleteForPlayer(BYTE bytePlayerID, BYTE byteObjectID);
 	
 	void Process(float fElapsedTime);
 
 	// Retrieve an object by id
-	CObject* GetAt(int iObjectID)
+	CObject* GetAt(BYTE byteObjectID)
 	{
-		return (iObjectID >= 0 && iObjectID < MAX_OBJECTS) ? m_pObjects[iObjectID] : nullptr;
+		if(byteObjectID > MAX_OBJECTS) { return NULL; }
+		return m_pObjects[byteObjectID];
 	};
 	
-	CObject* GetAtIndividual(int iPlayerID, int iObjectID)
+	CObject* GetAtIndividual(BYTE bytePlayerID, BYTE byteObjectID)
 	{
-		return ((iPlayerID >= 0 && iPlayerID < MAX_PLAYERS) &&
-			(iObjectID >= 0 && iObjectID < MAX_OBJECTS)) ? m_pPlayerObjects[iPlayerID][iObjectID] : nullptr;
+		if (byteObjectID > MAX_OBJECTS || bytePlayerID > MAX_PLAYERS) { return NULL; }
+		return m_pPlayerObjects[bytePlayerID][byteObjectID];
 	};
 
+
 	// Find out if the slot is inuse.
-	bool GetSlotState(int iObjectID)
+	BOOL GetSlotState(BYTE byteObjectID)
 	{
-		return (iObjectID >= 0 && iObjectID < MAX_PLAYERS) ? m_bObjectSlotState[iObjectID] : false;
+		if(byteObjectID > MAX_OBJECTS) { return FALSE; }
+		return m_bObjectSlotState[byteObjectID];
 	};
 	
 	// Find out if the slot is inuse by an individual (and not global).
-	bool GetPlayerSlotState(int iPlayerID, int iObjectID)
+	BOOL GetPlayerSlotState(BYTE bytePlayerID, BYTE byteObjectID)
 	{
-		return
-			((iPlayerID >= 0 && iPlayerID < MAX_PLAYERS) &&
-			(iObjectID >= 0 && iObjectID < MAX_OBJECTS) &&
-			!m_bPlayersObject[iObjectID]) ? m_bPlayerObjectSlotState[iPlayerID][iObjectID] : false;
+		if (byteObjectID > MAX_OBJECTS || bytePlayerID > MAX_PLAYERS) { return FALSE; }
+		//if (m_pObjects[byteObjectID]) return TRUE; // Can't use global slots
+		if (!m_bPlayersObject[byteObjectID]) { return FALSE; } // Can use empty ones
+		return m_bPlayerObjectSlotState[bytePlayerID][byteObjectID];
 	};
 
 	void InitForPlayer(BYTE bytePlayerID);

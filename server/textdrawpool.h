@@ -9,13 +9,44 @@ Version: $Id: textdrawpool.h,v 1.0 2007/05/18 19:26:45 Y_Less Exp $
 
 */
 
+#define MAX_TEXT_DRAW_LINE 256
+
+typedef struct _TEXT_DRAW_TRANSMIT
+{
+	float fLetterWidth;
+	float fLetterHeight;
+	DWORD dwLetterColor;
+	float fLineWidth;
+	float fLineHeight;
+	DWORD dwBoxColor;
+	union
+	{
+		BYTE byteFlags;
+		struct
+		{
+			BYTE byteBox : 1;
+			BYTE byteLeft : 1;
+			BYTE byteRight : 1;
+			BYTE byteCenter : 1;
+			BYTE byteProportional : 1;
+			BYTE bytePadding : 3;
+		};
+	};
+	BYTE byteShadow;
+	BYTE byteOutline;
+	DWORD dwBackgroundColor;
+	BYTE byteStyle;
+	float fX;
+	float fY;
+} TEXT_DRAW_TRANSMIT;
+
 //----------------------------------------------------
 
 class CTextDrawPool
 {
 private:
 
-	bool				m_bSlotState[MAX_TEXT_DRAWS];
+	BOOL				m_bSlotState[MAX_TEXT_DRAWS];
 	TEXT_DRAW_TRANSMIT*	m_TextDraw[MAX_TEXT_DRAWS];
 	PCHAR				m_szFontText[MAX_TEXT_DRAWS];
 	bool				m_bHasText[MAX_TEXT_DRAWS][MAX_PLAYERS];
@@ -31,9 +62,10 @@ public:
 	void HideForPlayer(BYTE bytePlayer, WORD wText);
 	void HideForAll(WORD wText);
 
-	bool GetSlotState(int iText)
+	BOOL GetSlotState(WORD wText)
 	{
-		return (iText >= 0 && iText < MAX_TEXT_DRAWS) ? m_bSlotState[iText] : false;
+		if (wText >= MAX_TEXT_DRAWS) return FALSE;
+		return m_bSlotState[wText];
 	};
 	
 	void SetLetterSize(WORD wText, float fXSize, float fYSize);

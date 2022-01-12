@@ -24,13 +24,42 @@
 
 //#define RAKRCON
 
+#define MAX_PLAYER_NAME			24
+#ifdef SCRIPTING_ONLY
+#define MAX_PLAYERS				8		// Only 8 players for scripting builds
+#else
+#define MAX_PLAYERS				200
+#endif
+#define MAX_VEHICLES			700
 #define MAX_FILTER_SCRIPTS		16
+#define MAX_OBJECTS				255
+#define MAX_MENUS				128
+#define MAX_TEXT_DRAWS			1024
+#define MAX_GANG_ZONES			1024
+#define MAX_CMD_INPUT			128		// This limitation is also found on the client. it applies to chat and commands.
 
 #define DEFAULT_MAX_PLAYERS		32
 #define DEFAULT_LISTEN_PORT		8192
 #define DEFAULT_RCON_PORT		8193
 #define DEFAULT_RCON_MAXUSERS	8
-#define DEFAULT_RCON_PASSWORD	"changeme"
+
+#define EVENT_TYPE_PAINTJOB			1
+#define EVENT_TYPE_CARCOMPONENT		2
+#define EVENT_TYPE_CARCOLOR			3
+
+#define PI 3.14159265
+
+#define ARRAY_SIZE(a)	( sizeof((a)) / sizeof(*(a)) )
+#define SAFE_DELETE(p)	{ if (p) { delete (p); (p) = NULL; } }
+#define SAFE_RELEASE(p)	{ if (p) { (p)->Release(); (p) = NULL; } }
+
+// ------------
+// VERSION INFO
+// ------------
+
+#define SAMP_VERSION "0.2X"
+#define NETGAME_VERSION 8866
+
 // ------------
 // OS SPECIFICS
 // ------------
@@ -45,7 +74,6 @@
 	#include <malloc.h>
 	#include <shellapi.h>
 	#include <time.h>
-	#include <Shlwapi.h>
 #else
 	#define SLEEP(x) { usleep(x * 1000); }
 	#define MAX_PATH 260
@@ -89,45 +117,27 @@ typedef struct _SERVER_SETTINGS {
 #include <map>
 #include <string>
 #include <vector>
-#include <sstream>
 
 // Raknet
-#include <raknet/RakServer.h>
-#include <raknet/BitStream.h>
-#include <raknet/PacketEnumerations.h>
-#include <raknet/SAMPRPC.h>
-#include <raknet/SAMPCipher.h>
-#include <raknet/StringCompressor.h>
-#include <raknet/DS_Map.h>
+#include "../raknet/RakServer.h"
+#include "../raknet/RakNetworkFactory.h"
+#include "../raknet/BitStream.h"
+#include "../raknet/PacketEnumerations.h"
+#include "../raknet/SAMPRPC.h"
 
 // amx
-#include <amx/amx.h>
-
-// SQLite3
-#include <sqlite/sqlite3.h>
-
-// SHA2-256
-#include <sha2/sha256.h>
-
-// Shared stuffs
-#include "shared.h"
+#include "amx/amx.h"
 
 // SA:MP
+
+typedef unsigned short VEHICLEID;
+
 #include "system.h"
 #include "console.h"
-#include "sampmap.h"
-#include "servervars.h"
-#include "playervars.h"
-#include "artwork.h"
-#include "httpclient.h"
-#include "threadedhttp.h"
 #include "scrtimers.h"
 #include "gamemodes.h"
 #include "filterscripts.h"
 #include "netrpc.h"
-#include "labelpool.h"
-#include "playerlabelpool.h"
-#include "playertextdrawpool.h"
 #include "player.h"
 #include "playerpool.h"
 #include "vehicle.h"
@@ -139,13 +149,9 @@ typedef struct _SERVER_SETTINGS {
 #include "menupool.h"
 #include "textdrawpool.h"
 #include "gangzonepool.h"
-#include "actor.h"
-#include "actorpool.h"
 #include "netgame.h"
 #include "plugins.h"
-//#include "rcon.h"
-#include "runutil.h"
-#include "scrcore.h"
+#include "rcon.h"
 
 // ---------
 // EXTERNALS
@@ -154,24 +160,13 @@ typedef struct _SERVER_SETTINGS {
 extern CConsole* pConsole;
 extern CNetGame* pNetGame;
 extern CPlugins* pPlugins;
-extern CArtwork* pArtwork;
 
-/*#ifdef RAKRCON
+#ifdef RAKRCON
 extern CRcon *pRcon;
-#endif*/
+#endif
 
-extern WORD	wRconUser;
-extern bool bRconSocketReply;
-extern bool g_bDBLogging;
-extern bool g_bDBLogQueries;
-extern bool bGameModeFinished;
-extern bool	bQuitApp;
-extern unsigned int _uiRndSrvChallenge;
-extern float g_fStreamDistance;
-extern int g_iStreamRate;
-extern bool bQueryLogging;
-extern int iSleepTime;
-extern CServerVars ServerVars;
+extern BYTE byteRconUser;
+extern BOOL bRconSocketReply;
 
 // -------------------
 // FUNCTION PROTOTYPES
@@ -180,7 +175,6 @@ extern CServerVars ServerVars;
 void logprintf(char* format, ...);
 void flogprintf(char* format, ...);
 void LoadLogFile();
-bool RCONPasswordValid();
 
 #ifdef LINUX
 void SignalHandler(int sig);

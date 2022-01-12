@@ -20,19 +20,18 @@
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int nCmdShow)
 {
-	if(!strlen(lpszCmdLine) || strlen(lpszCmdLine) > 5) return 0;
-	
-	CHttpClient* pHttpClient = new CHttpClient(0);
+	if(!strlen(lpszCmdLine) || strlen(lpszCmdLine) > 5)	return 0;
+
+	CHttpClient* pHttpClient = new CHttpClient;
 
 	//OutputDebugString(lpszCmdLine);
 
-	char szURL[1025];
-	memset(szURL,0,sizeof szURL);
-	sprintf(szURL,"server.sa-mp.com/0.3.7/announce/%s",lpszCmdLine);
-
+	char szURL[255];
+	sprintf(szURL, "server.sa-mp.com/0.2.X/announce/%s",lpszCmdLine);
+	
 	pHttpClient->ProcessURL(HTTP_GET, szURL, NULL, "Bonus");
 
-	if(pHttpClient) delete pHttpClient;
+	delete pHttpClient;
 
 	ExitProcess(0);
 
@@ -43,21 +42,16 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmd
 
 int main(int argc, char *argv[])
 {
-	char* szBindAddress = NULL;
+	if((argc != 2) || strlen(argv[1]) > 5)	return 0;
 
-	if((argc <= 1) || (argc > 3) || strlen(argv[1]) > 5)	return 0;
+	CHttpClient* pHttpClient = new CHttpClient;
 
-	if(argc == 3)
-		szBindAddress = argv[2];
-
-	CHttpClient* pHttpClient = new CHttpClient(szBindAddress);
-	
 	char szURL[255];
-	sprintf(szURL,"server.sa-mp.com/0.3.7/announce/%s",argv[1]);
-
+	sprintf(szURL, "server.sa-mp.com/0.2.X/announce/%s",argv[1]);
+	
 	pHttpClient->ProcessURL(HTTP_GET, szURL, NULL, "Bonus");
 
-	if(pHttpClient) delete pHttpClient;
+	delete pHttpClient;
 
 	return 0;
 }

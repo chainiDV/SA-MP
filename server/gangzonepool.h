@@ -15,25 +15,25 @@ class CGangZonePool
 {
 private:
 	float			m_fGangZone[MAX_GANG_ZONES][4];
-	bool			m_bSlotState[MAX_GANG_ZONES];
+	BOOL			m_bSlotState[MAX_GANG_ZONES];
 public:
 	CGangZonePool();
 	~CGangZonePool() {};
 	WORD New(float fMinX, float fMinY, float fMaxX, float fMaxY);
 	void Delete(WORD wZone);
-	void ShowForPlayer(WORD wPlayer, WORD wZone, DWORD dwColor);
+	void ShowForPlayer(BYTE bytePlayer, WORD wZone, DWORD dwColor);
 	void ShowForAll(WORD wZone, DWORD dwColor);
-	void HideForPlayer(WORD wPlayer, WORD wZone);
+	void HideForPlayer(BYTE bytePlayer, WORD wZone);
 	void HideForAll(WORD wZone);
-	void FlashForPlayer(WORD wPlayer, WORD wZone, DWORD dwColor);
+	void FlashForPlayer(BYTE bytePlayer, WORD wZone, DWORD dwColor);
 	void FlashForAll(WORD wZone, DWORD dwColor);
-	void StopFlashForPlayer(WORD wPlayer, WORD wZone);
+	void StopFlashForPlayer(BYTE bytePlayer, WORD wZone);
 	void StopFlashForAll(WORD wZone);
-	bool GetSlotState(WORD wZone)
+	BOOL GetSlotState(WORD wZone)
 	{
 		if (wZone >= MAX_GANG_ZONES) return FALSE;
 		return m_bSlotState[wZone];
-	}
+	};
 };
 
 //----------------------------------------------------

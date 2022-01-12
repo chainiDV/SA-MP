@@ -16,12 +16,12 @@ CMenuPool::CMenuPool()
 	// loop through and initialize all net players to null and slot states to false
 	for (BYTE byteMenuID = 0; byteMenuID < MAX_MENUS; byteMenuID++)
 	{
-		m_bMenuSlotState[byteMenuID] = false;
+		m_bMenuSlotState[byteMenuID] = FALSE;
 		m_pMenus[byteMenuID] = NULL;
 	}
 	for (BYTE bytePlayer = 0; bytePlayer < MAX_PLAYERS; bytePlayer++)
 	{
-		m_bytePlayerMenu[bytePlayer] = INVALID_MENU_ID;
+		m_bytePlayerMenu[bytePlayer] = 255;
 	}
 }
 
@@ -48,9 +48,9 @@ BYTE CMenuPool::New(PCHAR pTitle, float fX, float fY, BYTE byteColumns, float fC
 	
 	for (byteMenuID = 1; byteMenuID < MAX_MENUS; byteMenuID++)
 	{
-		if (m_bMenuSlotState[byteMenuID] == false) break;
+		if (m_bMenuSlotState[byteMenuID] == FALSE) break;
 	}
-	if (byteMenuID == MAX_MENUS) return INVALID_MENU_ID;
+	if (byteMenuID == MAX_MENUS) return 0xFF;
 
 	CMenu* pMenu = new CMenu(pTitle, fX, fY, byteColumns, fCol1Width, fCol2Width);
 	//m_pMenus[byteMenuID] = new CMenu();
@@ -58,25 +58,25 @@ BYTE CMenuPool::New(PCHAR pTitle, float fX, float fY, BYTE byteColumns, float fC
 	if (pMenu)
 	{
 		//m_pMenu
-		m_bMenuSlotState[byteMenuID] = true;
+		m_bMenuSlotState[byteMenuID] = TRUE;
 		pMenu->SetID(byteMenuID);
 		m_pMenus[byteMenuID] = pMenu;
 		return byteMenuID;
 	}
-	return INVALID_MENU_ID;
+	return 0xFF;
 }
 
 //----------------------------------------------------
 
-bool CMenuPool::Delete(BYTE byteMenuID)
+BOOL CMenuPool::Delete(BYTE byteMenuID)
 {
-	if (m_bMenuSlotState[byteMenuID] == false || !m_pMenus[byteMenuID])
+	if (m_bMenuSlotState[byteMenuID] == FALSE || !m_pMenus[byteMenuID])
 	{
-		return false;
+		return FALSE;
 	}
-	m_bMenuSlotState[byteMenuID] = false;
+	m_bMenuSlotState[byteMenuID] = FALSE;
 	delete m_pMenus[byteMenuID];
 	m_pMenus[byteMenuID] = NULL;
 
-	return true;
+	return TRUE;
 }

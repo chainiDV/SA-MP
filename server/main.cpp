@@ -12,44 +12,23 @@
 CNetGame		*pNetGame	= NULL;
 CConsole		*pConsole	= NULL;
 CPlugins		*pPlugins	= NULL;
-CArtwork		*pArtwork	= NULL;
 
 SERVER_SETTINGS gServerSettings;
 
-/*#ifdef RAKRCON
+#ifdef RAKRCON
 CRcon		*pRcon		= NULL;
-#endif*/
+#endif
 
-WORD		wRconUser=    INVALID_ID;
+BYTE		byteRconUser= INVALID_ID;
 SOCKET		sockRconReply=INVALID_SOCKET;
 void*		dataRconReply=NULL;
 DWORD		dwdlRconReply=0;
 
 FILE		*pLogFile;
 bool		bQuitApp = false;
-bool		bGameModeFinished=false;
+BOOL		bGameModeFinished=FALSE;
 
 unsigned int _uiRndSrvChallenge;
-unsigned int _uiRndCookieChallenge;
-RakNet::Time _timeCookieLastUpdated;
-
-float g_fStreamDistance = 200.f;
-int g_iStreamRate = 1000;
-
-bool g_bDBLogging = true;
-bool g_bDBLogQueries = true;
-
-bool bQueryLogging = false;
-
-int iSleepTime = 5;
-int iMessageHoleLimit = 3000;
-int iPlayerTimeOutTime = 10000;
-int iConnSeedTime = 300000;
-int iConnCookies = 1;
-int iCookieLogging = 1;
-bool bUseArtwork = false;
-
-CServerVars ServerVars;
 
 #ifdef WIN32
 extern LONG WINAPI exc_handler(_EXCEPTION_POINTERS* exc_inf);
@@ -102,26 +81,6 @@ BOOL WINAPI CtrlHandler(DWORD type)
 
 //----------------------------------------------------
 
-void ServerWeatherChanged()
-{
-	if (pNetGame)
-	{
-		int iWeatherId = atoi(pConsole->GetStringVariable("weather"));
-		pNetGame->SetWeather(iWeatherId);
-		logprintf("Weather set to %d", iWeatherId);
-	}
-}
-
-void ServerGravityChanged()
-{
-	if (pNetGame)
-	{
-		float fGravity = std::stof(pConsole->GetStringVariable("gravity"));
-		pNetGame->SetGravity(fGravity);
-		logprintf("Gravity set to %.3f", fGravity);
-	}
-}
-
 void ServerPasswordChanged()
 {
 	if (pNetGame)
@@ -164,25 +123,6 @@ void ServerInstagibChanged()
 	if (pNetGame) {
 		pNetGame->UpdateInstagib();
 	}
-}
-
-static void ServerPlayerPerIPChanged()
-{
-	int iNewVal = pConsole->GetIntVariable("maxplayerperip");
-	if (iNewVal < 1)
-		pConsole->SetIntVariable("maxplayerperip", 1);
-}
-
-static void ServerStreamRateChanged()
-{
-	int iRate = pConsole->GetIntVariable("stream_rate");
-	pConsole->SetIntVariable("stream_rate", (iRate < 500) ? 500 : (iRate > 5000) ? 5000 : iRate);
-}
-
-static void ServerStreamDistanceChanged()
-{
-	float fDistance = pConsole->GetFloatVariable("stream_distance");
-	pConsole->SetFloatVariable("stream_distance", (fDistance < 50.f) ? 50.f : (fDistance > 400.f) ? 400.f : fDistance);
 }
 
 //----------------------------------------------------
@@ -282,19 +222,14 @@ int main (int argc, char** argv)
 	bool bEnableAnnounce = true;
 	int iMaxPlayers	= DEFAULT_MAX_PLAYERS;
 	int iListenPort	= DEFAULT_LISTEN_PORT;
-	//int iRconPort	= DEFAULT_RCON_PORT;
-	//int iRconMaxAdmins	= DEFAULT_RCON_MAXUSERS;
+	int iRconPort	= DEFAULT_RCON_PORT;
+	int iRconMaxAdmins	= DEFAULT_RCON_MAXUSERS;
 	bool bLanModeEnable = false;
 	bool bEnableTimestamp = true;
 	bool bEnableInstagib = false;
 	bool bGameMod = false;
-	//bool bEnableAC = false;
+	bool bEnableAC = false;
 	bool bAllowQuery = true;
-	int iMTUSize = MAXIMUM_MTU_SIZE;
-	int iChatLogging = 1;
-	int iOnFootRate = 40;
-	int iInCarRate = 40;
-	int iMaxPlayerPerIP = 3;
 
 	// Open the log file
 	LoadLogFile();
@@ -327,8 +262,6 @@ int main (int argc, char** argv)
 	// Create a challenge number for the clients to be able to connect
 	srand(time(NULL));
 	_uiRndSrvChallenge = (unsigned int)rand();
-	_uiRndCookieChallenge = (unsigned int)rand();
-	_timeCookieLastUpdated = RakNet::GetTime();
     
 	// Create the Console
 	pConsole = new CConsole();
@@ -360,53 +293,33 @@ int main (int argc, char** argv)
 
 	pConsole->AddVariable("lanmode",CON_VARTYPE_BOOL,0, &bLanModeEnable);
 	pConsole->AddVariable("query",CON_VARTYPE_BOOL, 0, &bAllowQuery);
-	pConsole->AddVariable("logqueries",CON_VARTYPE_BOOL, 0, &bQueryLogging);
 
-/*#ifdef RAKRCON
+#ifdef RAKRCON
 	pConsole->AddVariable("rcon_port", CON_VARTYPE_INT, 0, &iRconPort);
 	pConsole->AddVariable("rcon_maxadmins", CON_VARTYPE_INT, 0, &iRconMaxAdmins);
 	pConsole->AddStringVariable("rcon_bind", 0, NULL);
-#endif*/
+#endif
 
 #ifdef LINUX
 	pConsole->AddVariable("output",CON_VARTYPE_BOOL,0,&bOutputEnable);
 #endif
 
-	pConsole->AddVariable("mtu", CON_VARTYPE_INT, 0, &iMTUSize);
 	pConsole->AddVariable("timestamp",CON_VARTYPE_BOOL,0,&bEnableTimestamp);
-	pConsole->AddStringVariable("logtimeformat", 0, "[%H:%M:%S]");
 	pConsole->AddStringVariable("password", 0, NULL, ServerPasswordChanged);
 	pConsole->AddStringVariable("hostname", 0, "SA:MP Server");
 	pConsole->AddStringVariable("mapname", CON_VARFLAG_RULE, "San Andreas");
-	pConsole->AddStringVariable("language", CON_VARFLAG_RULE, "");
 	pConsole->AddStringVariable("weburl", CON_VARFLAG_RULE, "www.sa-mp.com");
-	pConsole->AddStringVariable("rcon_password", 0, DEFAULT_RCON_PASSWORD);
-	pConsole->AddStringVariable("gravity", CON_VARFLAG_RULE, "0.008", ServerGravityChanged);
-	pConsole->AddStringVariable("weather", CON_VARFLAG_RULE, "10", ServerWeatherChanged);
+	pConsole->AddStringVariable("rcon_password", 0, "changeme");
+	pConsole->AddStringVariable("gravity", CON_VARFLAG_RULE, "0.008");
+	pConsole->AddStringVariable("weather", CON_VARFLAG_RULE, "10");
 	//pConsole->AddStringVariable("tirepopping", CON_VARFLAG_RULE, "0");
 	pConsole->AddStringVariable("gamemodetext", 0, "Unknown");
 	pConsole->AddStringVariable("filterscripts", 0, "");
 	pConsole->AddStringVariable("plugins", 0, "");
-	//pConsole->AddStringVariable("nosign", 0, "");
-	//pConsole->AddVariable("anticheat",CON_VARTYPE_BOOL, /* CON_VARFLAG_RULE */ 0, &bEnableAC);
+	pConsole->AddStringVariable("nosign", 0, "");
+	pConsole->AddVariable("anticheat",CON_VARTYPE_BOOL, /* CON_VARFLAG_RULE */ 0, &bEnableAC);
 	pConsole->AddVariable("instagib", CON_VARTYPE_BOOL, CON_VARFLAG_RULE, &bEnableInstagib, ServerInstagibChanged);
 	pConsole->AddVariable("myriad", CON_VARTYPE_BOOL, 0, &bGameMod);
-	pConsole->AddVariable("chatlogging", CON_VARTYPE_INT, 0, &iChatLogging);
-	pConsole->AddVariable("messageholelimit", CON_VARTYPE_INT, 0, &iMessageHoleLimit);
-	pConsole->AddVariable("playertimeout", CON_VARTYPE_INT, 0, &iPlayerTimeOutTime);
-	pConsole->AddVariable("db_logging", CON_VARTYPE_INT, 0, &g_bDBLogging);
-	pConsole->AddVariable("db_log_queries", CON_VARTYPE_INT, 0, &g_bDBLogQueries);
-	pConsole->AddVariable("onfoot_rate", CON_VARTYPE_INT, 0, &iOnFootRate);
-	pConsole->AddVariable("incar_rate", CON_VARTYPE_INT, 0, &iInCarRate);
-	pConsole->AddVariable("maxplayerperip", CON_VARTYPE_INT, 0, &iMaxPlayerPerIP, ServerPlayerPerIPChanged);
-	pConsole->AddVariable("stream_rate", CON_VARTYPE_INT, 0, &g_iStreamRate, ServerStreamRateChanged);
-	pConsole->AddVariable("stream_distance", CON_VARTYPE_FLOAT, 0, &g_fStreamDistance, ServerStreamDistanceChanged);
-	pConsole->AddVariable("sleep", CON_VARTYPE_INT, 0, &iSleepTime);
-	pConsole->AddVariable("connseedtime", CON_VARTYPE_INT, 0, &iConnSeedTime);
-	pConsole->AddVariable("conncookies", CON_VARTYPE_INT, 0, &iConnCookies);
-	pConsole->AddVariable("cookielogging", CON_VARTYPE_INT, 0, &iCookieLogging);
-	pConsole->AddVariable("useartwork", CON_VARTYPE_BOOL, 0, &bUseArtwork);
-	pConsole->AddStringVariable("artpath", 0, "models");
 
 	// Add 16 gamemode variables.
 	int x=0;
@@ -420,18 +333,13 @@ int main (int argc, char** argv)
 	// Exec the server config!
 	pConsole->Execute("exec server");
 
-	/*if ( !strcmp( pConsole->GetStringVariable("rcon_password"), "changeme" ) )
+	if ( !strcmp( pConsole->GetStringVariable("rcon_password"), "changeme" ) )
 	{
 		logprintf("Error: Your password must be changed from the default password, please change it.");
 		return 0;
-	}*/
-
-	if (!RCONPasswordValid()) {
-		logprintf("Info: RCON has been disabled. To re-enable, change your \"rcon_password\" string variable.");
 	}
 
 	// Change some var flags to read-only (can only be accessed from server.cfg).
-	//pConsole->ModifyVariableFlags("mtu", CON_VARFLAG_READONLY);
 	pConsole->ModifyVariableFlags("maxplayers", CON_VARFLAG_READONLY);
 	pConsole->ModifyVariableFlags("bind", CON_VARFLAG_READONLY);
 	pConsole->ModifyVariableFlags("port", CON_VARFLAG_READONLY);
@@ -439,17 +347,8 @@ int main (int argc, char** argv)
 	pConsole->ModifyVariableFlags("rcon_port", CON_VARFLAG_READONLY);
 	pConsole->ModifyVariableFlags("filterscripts", CON_VARFLAG_READONLY);
 	pConsole->ModifyVariableFlags("plugins", CON_VARFLAG_READONLY);
-	//pConsole->ModifyVariableFlags("anticheat", CON_VARFLAG_READONLY /* | CON_VARFLAG_RULE */);
-	//pConsole->ModifyVariableFlags("nosign", CON_VARFLAG_READONLY);
-	pConsole->ModifyVariableFlags("onfoot_rate", CON_VARFLAG_READONLY);
-	pConsole->ModifyVariableFlags("incar_rate", CON_VARFLAG_READONLY);
-	pConsole->ModifyVariableFlags("useartwork", CON_VARFLAG_READONLY);
-	pConsole->ModifyVariableFlags("artpath", CON_VARFLAG_READONLY);
-
-	if (bUseArtwork)
-		pConsole->AddStringVariable("artwork", CON_VARFLAG_RULE | CON_VARFLAG_READONLY, "Yes");
-	else
-		pConsole->AddStringVariable("artwork", CON_VARFLAG_RULE | CON_VARFLAG_READONLY, "No");
+	pConsole->ModifyVariableFlags("anticheat", CON_VARFLAG_READONLY /* | CON_VARFLAG_RULE */);
+	pConsole->ModifyVariableFlags("nosign", CON_VARFLAG_READONLY);
 
 	// Add the version as a rule
 	pConsole->AddStringVariable("version", CON_VARFLAG_RULE | CON_VARFLAG_READONLY, SAMP_VERSION);
@@ -470,18 +369,12 @@ int main (int argc, char** argv)
 	pPlugins = new CPlugins();
 	pPlugins->LoadPlugins("plugins");
 
-	if (bUseArtwork) {
-		pArtwork = new CArtwork(pConsole->GetStringVariable("artpath"));
-		if (pArtwork)
-			pArtwork->ReadConfig("artconfig.txt");
-	}
-
 	// Create the NetGame.
 	pNetGame = new CNetGame();
 	pNetGame->Init(true);
 
 	// Start the rcon server
-	/*PCHAR szBindAddress = pConsole->GetStringVariable("rcon_bind");
+	PCHAR szBindAddress = pConsole->GetStringVariable("rcon_bind");
 	if (!szBindAddress || szBindAddress[0] == 0)
 		szBindAddress = pConsole->GetStringVariable("bind");
 	if (!szBindAddress || szBindAddress[0] == 0)
@@ -493,20 +386,20 @@ int main (int argc, char** argv)
 						pConsole->GetIntVariable("rcon_maxadmins"),
 						szBindAddress);
 	pRcon->Process();
-#endif*/
+#endif
 
 	// While the app is running...
 	while (!bQuitApp)
 	{
 		pNetGame->Process();
 
-/*#ifdef RAKRCON
+#ifdef RAKRCON
 		pRcon->Process();
-#endif*/
+#endif
 
-		if(bGameModeFinished) {
+		if(TRUE == bGameModeFinished) {
 			pNetGame->ShutdownForGameModeRestart();
-			bGameModeFinished = false;
+			bGameModeFinished = FALSE;
 		}
 
 		#ifdef WIN32
@@ -514,23 +407,16 @@ int main (int argc, char** argv)
 			WaitForSingleObject(hConsoleExecuteEvent, INFINITE);
 		#endif
 
-		RakNet::Time now = RakNet::GetTime();
-		if ((int)(now - _timeCookieLastUpdated) > iConnSeedTime)
-		{
-			_uiRndCookieChallenge = (unsigned int)rand();
-			_timeCookieLastUpdated = now;
-		}
-
-		SLEEP(iSleepTime);
+		SLEEP(10);		
 	}
 
-/*#ifdef RAKRCON
+#ifdef RAKRCON
 	delete pRcon;
-#endif*/
+#endif
 
-	SAFE_DELETE(pNetGame);
-	SAFE_DELETE(pArtwork); // additional
-	SAFE_DELETE(pPlugins);
+	delete pNetGame;
+
+	delete pPlugins;
 
 	// If WIN32: Kill the input thread.
 	#ifdef WIN32
@@ -538,7 +424,7 @@ int main (int argc, char** argv)
 		CloseHandle(hConsoleExecuteEvent);
 	#endif
 
-	SAFE_DELETE(pConsole);
+	delete pConsole;
 
 	fclose(pLogFile);
 
@@ -571,14 +457,13 @@ void logprintf(char* format, ...)
 		if (pConsole) {
 			if (pConsole->GetBoolVariable("timestamp"))
 			{
-				char* tmfrmt = pConsole->GetStringVariable("logtimeformat");
 				const struct tm *tm;
 				time_t now;
 				now = time(NULL);
 				tm = localtime(&now);
 				char *s;
 				s = new char[256];
-				strftime(s, 256, (tmfrmt && tmfrmt[0] != 0) ? (tmfrmt) : ("[%H:%M:%S]"), tm);
+				strftime(s, 256, "[%H:%M:%S]", tm);
 				fprintf(pLogFile, "%s %s\n", s, buffer);
 				delete [] s;
 			}
@@ -588,9 +473,9 @@ void logprintf(char* format, ...)
 		fflush(pLogFile);
 	}
 
-	if (wRconUser != INVALID_ID)
+	if (byteRconUser != INVALID_ID)
 	{
-		pNetGame->SendClientMessage(pNetGame->GetRakServer()->GetPlayerIDFromIndex(wRconUser), 0xFFFFFFFF, buffer);
+		pNetGame->SendClientMessage(pNetGame->GetRakServer()->GetPlayerIDFromIndex(byteRconUser), 0xFFFFFFFF, buffer);
 	} else if (bRconSocketReply) {
 		RconSocketReply(buffer);
 	}
@@ -666,13 +551,3 @@ void SetStringFromCommandLine(char *szCmdLine, char *szString)
 }
 
 //----------------------------------------------------
-
-bool RCONPasswordValid()
-{
-	if (pConsole) {
-		char* str = pConsole->GetStringVariable("rcon_password");
-		if (str != NULL && str[0] != '\0' && strcmp(str, DEFAULT_RCON_PASSWORD) != 0)
-			return true;
-	}
-	return false;
-}

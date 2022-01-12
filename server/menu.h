@@ -10,6 +10,19 @@ Version: $Id: menu.h,v 1.0 2007/02/13 19:26:45 Y_Less Exp $
 #ifndef SAMPSRV_MENU_H
 #define SAMPSRV_MENU_H
 
+#define MAX_MENU_ITEMS 12
+#define MAX_MENU_LINE 32
+#define MAX_COLUMNS 2
+
+//----------------------------------------------------
+
+struct MENU_INT
+{
+	BOOL bMenu;
+	BOOL bRow[MAX_MENU_ITEMS];
+	BOOL bPadding[8 - ((MAX_MENU_ITEMS + 1) % 8)]; 
+};
+
 class CMenu
 {
 private:
@@ -20,7 +33,7 @@ private:
 	CHAR m_charItems[MAX_MENU_ITEMS][MAX_COLUMNS][MAX_MENU_LINE];
 	CHAR m_charHeader[MAX_COLUMNS][MAX_MENU_LINE];
 	
-	bool m_bInitedForPlayer[MAX_PLAYERS];
+	BOOL m_bInitedForPlayer[MAX_PLAYERS];
 	MENU_INT m_MenuInteraction;
 	
 	float m_fXPos;
@@ -51,12 +64,11 @@ public:
 	
 	void ResetPlayer(BYTE bytePlayerID)
 	{
-		if (bytePlayerID < MAX_PLAYERS) m_bInitedForPlayer[bytePlayerID] = false;
+		if (bytePlayerID < MAX_PLAYERS) m_bInitedForPlayer[bytePlayerID] = FALSE;
 	};
-	void DisableInteraction() { m_MenuInteraction.bMenu = false; };
-	void DisableRow(BYTE byteRow) { m_MenuInteraction.bRow[byteRow] = false; };
+	void DisableInteraction() { m_MenuInteraction.bMenu = FALSE; };
+	void DisableRow(BYTE byteRow) { m_MenuInteraction.bRow[byteRow] = FALSE; };
 	
-	bool ValidRow(unsigned char ucRow);
 };
 
 #endif // SAMPSRV_MENU_H

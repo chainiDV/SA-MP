@@ -7,6 +7,7 @@
   #endinput
 #endif
 #define _string_included
+#pragma library String
 
 native strlen(const string[]);
 native strpack(dest[], const source[], maxlength=sizeof dest);

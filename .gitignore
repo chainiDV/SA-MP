@@ -32,18 +32,8 @@
 *.app
 
 # Visual Studio files
-.vs/
+.vs
 
-# Build files
-Debug/
-Release/
-
-# That stupid settings.ini from Pawno
-pawno/settings.ini
-
-# Lazarus generated files from exgui (Server browser and mod launcher)
-exgui_lazarus/backup/
-exgui_lazarus/lib/
-
-# RakNet
-sdk/raknet/*.cpp
+# Compilation files
+Debug
+Release

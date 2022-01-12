@@ -30,23 +30,14 @@
 
 //----------------------------------------------------
 
-CHttpClient::CHttpClient(char *szBindAddress)
+CHttpClient::CHttpClient()
 {
 	memset(&m_Request,0,sizeof(HTTP_REQUEST));
 	memset(&m_Response,0,sizeof(HTTP_RESPONSE));
-
-	m_iUseBind = 0;
-	memset(&m_szBindAddress,0,256);
-
-	if(szBindAddress) {
-		m_iUseBind = 1;
-		strcpy(m_szBindAddress,szBindAddress);
-	}
-
 	m_iError = HTTP_SUCCESS; // Request is successful until otherwise indicated
 	m_iSocket = (-1);
 
-	// Winsock init
+// Winsock init
 #ifdef WIN32
 	WORD				wVersionRequested;
 	WSADATA				wsaData;
@@ -108,12 +99,10 @@ bool CHttpClient::GetHeaderValue(char *szHeaderName,char *szReturnBuffer, int iB
 
 //----------------------------------------------------
 
-bool CHttpClient::Connect(char *szHost, int iPort, char *szBindAddress)
+bool CHttpClient::Connect(char *szHost, int iPort)
 {
 	struct sockaddr_in	sa;
-	struct sockaddr_in	bind_sa;
 	struct hostent		*hp;
-	struct hostent		*bind_hp;
 
 	// Hostname translation
 	if((hp=(struct hostent *)gethostbyname(szHost)) == NULL ) {
@@ -123,29 +112,12 @@ bool CHttpClient::Connect(char *szHost, int iPort, char *szBindAddress)
 
 	// Prepare a socket	
 	memset(&sa,0,sizeof(sa));
-	memset(&bind_sa,0,sizeof(bind_sa));
 	memcpy(&sa.sin_addr,hp->h_addr,hp->h_length);
 	sa.sin_family = hp->h_addrtype;
 	sa.sin_port = htons((unsigned short)iPort);
 
-	if(szBindAddress) {
-		if((bind_hp=(struct hostent *)gethostbyname(szHost)) == NULL) {
-			m_iError=HTTP_ERROR_BAD_HOST;
-			return false;
-		}
-
-		memcpy(&bind_sa.sin_addr,bind_hp->h_addr,bind_hp->h_length);
-		bind_sa.sin_family = bind_hp->h_addrtype;
-		bind_sa.sin_port = 0;
-	}
-
 	if((m_iSocket=socket(AF_INET,SOCK_STREAM,0)) < 0) {
 		m_iError=HTTP_ERROR_NO_SOCKET;
-		return false;
-	}
-
-	if(szBindAddress && bind(m_iSocket,(struct sockaddr *)&bind_sa,sizeof bind_sa) < 0) {
-		m_iError=HTTP_ERROR_CANT_CONNECT;
 		return false;
 	}
 
@@ -173,7 +145,7 @@ void CHttpClient::CloseConnection()
 //----------------------------------------------------
 
 bool CHttpClient::Send(char *szData)
-{
+{	
 	if(send(m_iSocket,szData,strlen(szData),0) < 0) {	
 		m_iError = HTTP_ERROR_CANT_WRITE;
 		return false;
@@ -207,7 +179,7 @@ void CHttpClient::InitRequest(int iType, char *szURL, char *szPostData, char *sz
 	strcpy(szUseURL,szURL);
 
 	// Copy the referer
-	if (szReferer) {
+	if(szReferer) {
 		strcpy(m_Request.referer,szReferer);
 	}
 
@@ -248,15 +220,8 @@ void CHttpClient::Process()
 	int   header_len;
 	char  request_head[16384];
 
-	if (m_iUseBind) {
-		if (!Connect(m_Request.host,m_Request.port,m_szBindAddress)) {
-			return;
-		}
-	}
-	else {
-		if (!Connect(m_Request.host,m_Request.port,0)) {
-			return;
-		}
+	if(!Connect(m_Request.host,m_Request.port)) {
+		return;
 	}
 
 	// Build the HTTP Header
@@ -281,7 +246,7 @@ void CHttpClient::Process()
 				strlen(m_Request.host)+strlen(POST_FORMAT)+
 				strlen(USER_AGENT)+strlen(m_Request.referer);
 			sprintf(request_head,POST_FORMAT,m_Request.file,USER_AGENT,m_Request.referer,m_Request.host,strlen(m_Request.data),m_Request.data);
-			break;
+			break;	
 	}
 
 	//OutputDebugString(request_head);
@@ -316,7 +281,7 @@ void CHttpClient::HandleEntity()
 	{
 		bytes_total+=bytes_read;
 		memcpy(response+(bytes_total-bytes_read),buffer,(unsigned int)bytes_read);
-
+	
 		if(!header_got)
 		{
 			if((head_end=strstr(response,"\r\n\r\n"))!=NULL
@@ -378,7 +343,7 @@ void CHttpClient::HandleEntity()
 	}
 
 	CloseConnection();
-
+	
 	response[bytes_total]='\0';
 
 	// check the returned header

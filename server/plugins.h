@@ -12,7 +12,7 @@
 #include "plugininternal.h"
 
 // Dev Key Structure. Make sure this is sync'd with the type in signtool/main.cpp
-/*typedef struct _tDevKeyStruct 
+typedef struct _tDevKeyStruct 
 {
 	unsigned int dwSHA1[5];
 	int iSerialNumber;
@@ -21,7 +21,7 @@
 	unsigned int dwFileHashes[4];
 	unsigned int dwRandomNonse;
 	char szInfoString[76];
-} tDevKeyStruct; // sizeof = 128 bytes*/
+} tDevKeyStruct; // sizeof = 128 bytes
 
 #ifdef LINUX
 	#include <dlfcn.h>
@@ -77,20 +77,19 @@ private:
 	
 	ServerPluginVector m_Plugins;
 
-	bool LoadSinglePlugin(char *szPluginPath);
+	BOOL LoadSinglePlugin(char *szPluginPath);
 	
-	/*void ConvertFromHex(unsigned char* pbBuffer, char* szData, unsigned int dwMaxLength);
+	void ConvertFromHex(unsigned char* pbBuffer, char* szData, unsigned int dwMaxLength);
 	bool VerifyPluginSignature(char* szPluginFilename);
-	bool IsValidForNoSign(char* szFilename);*/
+	bool IsValidForNoSign(char* szFilename);
 
 public:
 	CPlugins();
 	~CPlugins();
 
-	//void LoadPlugins(char *szSearchPath);
-	void LoadPlugins(std::string strPath);
-	//void LoadPluginsSearch(char *szSearchPath);
-	//DWORD GetPluginCount();
+	void LoadPlugins(char *szSearchPath);
+	void LoadPluginsSearch(char *szSearchPath);
+	DWORD GetPluginCount();
 	ServerPlugin_s* GetPlugin(DWORD index);
 
 	void DoProcessTick();
