@@ -192,7 +192,7 @@ int main (int argc, char** argv)
 	// While not wanting to quit...
 	while (!bQuitApp)
 	{
-		Sleep(100);	
+		Sleep(100); 
 	}
 
 	return 0;
