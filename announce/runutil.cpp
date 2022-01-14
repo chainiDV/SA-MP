@@ -248,7 +248,7 @@ return;
 
 //----------------------------------------------------
 
-void K_EncodeString(char *szInput, char *szOutput)
+/*void K_EncodeString(char* szInput, char* szOutput)
 {
 	char b;
 
@@ -262,11 +262,11 @@ void K_EncodeString(char *szInput, char *szOutput)
 		szOutput++;
 	}
 	*szOutput = 0;
-}
+}*/
 
 //----------------------------------------------------
 
-char * K_DecodeString(char *szInput)
+/*char* K_DecodeString(char* szInput)
 {
 	char b;
 	char *st = szInput;
@@ -281,7 +281,7 @@ char * K_DecodeString(char *szInput)
 	}
 
 	return st;
-}
+}*/
 
 //----------------------------------------------------
 
