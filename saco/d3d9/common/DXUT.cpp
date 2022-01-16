@@ -14,8 +14,10 @@
 // multimon.h is a stub module that fakes multiple monitor apis on Win32 OSes without them.
 // Only once source file should #define COMPILE_MULTIMON_STUBS
 //--------------------------------------------------------------------------------------
+#pragma warning(disable:4996) 
 #define COMPILE_MULTIMON_STUBS
 #include <multimon.h> 
+#pragma warning(default: 4996)
 
 
 //--------------------------------------------------------------------------------------
