@@ -119,6 +119,7 @@
     <ClCompile Include="..\raknet\NatPunchthrough.cpp" />
     <ClCompile Include="..\raknet\NetworkIDGenerator.cpp" />
     <ClCompile Include="..\raknet\NetworkTypes.cpp" />
+    <ClCompile Include="..\raknet\PacketCipher.cpp" />
     <ClCompile Include="..\raknet\PacketConsoleLogger.cpp" />
     <ClCompile Include="..\raknet\PacketFileLogger.cpp" />
     <ClCompile Include="..\raknet\PacketLogger.cpp" />
@@ -212,6 +213,7 @@
     <ClInclude Include="..\raknet\NatPunchthrough.h" />
     <ClInclude Include="..\raknet\NetworkIDGenerator.h" />
     <ClInclude Include="..\raknet\NetworkTypes.h" />
+    <ClInclude Include="..\raknet\PacketCipher.h" />
     <ClInclude Include="..\raknet\PacketConsoleLogger.h" />
     <ClInclude Include="..\raknet\PacketEnumerations.h" />
     <ClInclude Include="..\raknet\PacketFileLogger.h" />

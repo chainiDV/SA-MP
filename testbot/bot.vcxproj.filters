@@ -208,6 +208,9 @@
     <ClCompile Include="..\raknet\TEABlockEncryptor.cpp">
       <Filter>raknet</Filter>
     </ClCompile>
+    <ClCompile Include="..\raknet\PacketCipher.cpp">
+      <Filter>raknet</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="net\netrpc.h">
@@ -539,6 +542,9 @@
     </ClInclude>
     <ClInclude Include="main.h" />
     <ClInclude Include="..\raknet\TEABlockEncryptor.h">
+      <Filter>raknet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\raknet\PacketCipher.h">
       <Filter>raknet</Filter>
     </ClInclude>
   </ItemGroup>

@@ -314,6 +314,9 @@
     <ClCompile Include="netrpc.cpp" />
     <ClCompile Include="object.cpp" />
     <ClCompile Include="query.cpp" />
+    <ClCompile Include="..\raknet\PacketCipher.cpp">
+      <Filter>raknet</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="sqlite\sqlite3.h">
@@ -705,5 +708,8 @@
     <ClInclude Include="object.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="..\raknet\SAMPRPC.h" />
+    <ClInclude Include="..\raknet\PacketCipher.h">
+      <Filter>raknet</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

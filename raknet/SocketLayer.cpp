@@ -31,8 +31,13 @@
 #include <assert.h>
 #include "MTUSize.h"
 
-#include "zlib/zlib.h"
-#define COMPRESS_DECOMPRESS_BUFFERSIZE  50000
+#include "PacketCipher.h"
+#ifdef SAMPSRV
+#define ENCRYPT_DECRYPT_BUFFERSIZE 16384
+#else
+#define ENCRYPT_DECRYPT_BUFFERSIZE 32768
+#endif
+unsigned char pPacketBuffer[ENCRYPT_DECRYPT_BUFFERSIZE];
 
 #ifdef _WIN32
 #include <process.h>
@@ -321,13 +326,8 @@ const char* SocketLayer::DomainNameToIP( const char *domainName )
 }
 #endif
 
-unsigned long _sendtoUncompressedTotal=0;
-unsigned long _sendtoCompressedTotal=0;
-
 void SocketLayer::Write( const SOCKET writeSocket, const char* data, const int length )
 {
-	unsigned char pCompressBuffer[COMPRESS_DECOMPRESS_BUFFERSIZE]={0};
-
 #ifdef _DEBUG
 	assert( writeSocket != INVALID_SOCKET );
 #endif
@@ -343,16 +343,11 @@ void SocketLayer::Write( const SOCKET writeSocket, const char* data, const int l
 #else
 
 //----------------------------------------------
-// Kye Added: Zlib in socketlayer headend (client compresses)
+// Kye Added: Packet cipher in socketlayer headend (client encrypts)
 
   #ifndef SAMPSRV
-	uLongf destLen = COMPRESS_DECOMPRESS_BUFFERSIZE;
-	if(compress2(pCompressBuffer,&destLen,(Bytef *)data,length,1) != Z_OK) {
-		return;
-	}
-	_sendtoUncompressedTotal+=length;
-	_sendtoCompressedTotal+=destLen;
-	send( writeSocket, (char*)pCompressBuffer, destLen, 0 );
+	EncryptPacket(pPacketBuffer, (unsigned char*)data, (int*)&length);
+	send( writeSocket, (char*)pPacketBuffer, length, 0 );
   #else
 	send( writeSocket, data, length, 0 );
   #endif
@@ -401,19 +396,12 @@ bool SocketLayer::AssociateSocketWithCompletionPortAndRead( SOCKET readSocket, u
 #ifdef SAMPSRV
 	int ProcessQueryPacket(unsigned int binaryAddress, unsigned short port, char *data, int length, SOCKET s);
 #endif
-    
-unsigned long _recvfromUncompressedTotal=0;
-unsigned long _recvfromCompressedTotal=0;
-unsigned int lastBinaryAddr=0;
-DWORD		 dwLastConnectionTick=0;
-DWORD		 dwLastConnectAddr=0;
 
 int SocketLayer::RecvFrom( const SOCKET s, RakPeer *rakPeer, int *errorCode )
 {
 	int len;
 	char data[ MAXIMUM_MTU_SIZE ];
 	sockaddr_in sa;
-	unsigned char pDecompressBuffer[COMPRESS_DECOMPRESS_BUFFERSIZE] = {0};
 
 	const socklen_t len2 = sizeof( struct sockaddr_in );
 	sa.sin_family = AF_INET;
@@ -460,39 +448,25 @@ int SocketLayer::RecvFrom( const SOCKET s, RakPeer *rakPeer, int *errorCode )
 		{
 
 #ifdef SAMPSRV
-			// QUERY PACKETS ARE NOT COMPRESSED
+			// QUERY PACKETS ARE NOT CRYPTED
 			//logprintf("Raw ID: %c:%u",data[0],data[0]);
 
 			if(ProcessQueryPacket(sa.sin_addr.s_addr, portnum,(char*)data, len, s)) {
-				*errorCode = 0;
+				//*errorCode = 0;
 				return 1;
 			}
 #endif
 
 		//----------------------------------------------
-		// Kye Added: Zlib in socketlayer headend.
+		// Kye Added: Packet cipher in socketlayer headend.
 #ifdef SAMPSRV
-			uLongf destLen = COMPRESS_DECOMPRESS_BUFFERSIZE;
-		
-			PlayerID thisPlayerId;
-			thisPlayerId.binaryAddress = sa.sin_addr.s_addr;
-			thisPlayerId.port = portnum;
-
-			if(uncompress(pDecompressBuffer,&destLen,(Bytef *)data,len) != Z_OK) {
+			
+			if (!DecryptPacket(pPacketBuffer, (unsigned char*)data, &len)) {
 				*errorCode = 0;
 				return 1;
 			}
-
-			_recvfromCompressedTotal+=len;
-			_recvfromUncompressedTotal+=destLen;
-
-			// Code patch for sampfp DoS
-			if(pDecompressBuffer[0] == ID_OPEN_CONNECTION_REQUEST) {
-				
-			}
-			//logprintf("Decompressed ID: %u",pDecompressBuffer[0]);
 		
-			ProcessNetworkPacket( sa.sin_addr.s_addr, portnum, (char*)pDecompressBuffer, destLen, rakPeer );
+			ProcessNetworkPacket( sa.sin_addr.s_addr, portnum, (char*)pPacketBuffer, len, rakPeer );
 #else
 			ProcessNetworkPacket( sa.sin_addr.s_addr, portnum, data, len, rakPeer );  
 #endif
@@ -552,8 +526,6 @@ int SocketLayer::RecvFrom( const SOCKET s, RakPeer *rakPeer, int *errorCode )
 
 int SocketLayer::SendTo( SOCKET s, const char *data, int length, unsigned int binaryAddress, unsigned short port )
 {
-	unsigned char pCompressBuffer[COMPRESS_DECOMPRESS_BUFFERSIZE] = {0};
-
 	if ( s == INVALID_SOCKET )
 	{
 		return -1;
@@ -566,24 +538,18 @@ int SocketLayer::SendTo( SOCKET s, const char *data, int length, unsigned int bi
 	sa.sin_family = AF_INET;
 
 //----------------------------------------------
-// Kye Added: Zlib in socketlayer headend. (client sends compressed)
+// Kye Added: Packet cipher in socketlayer headend. (client sends encrypted)
 
 #ifndef SAMPSRV
 
-	uLongf destLen = COMPRESS_DECOMPRESS_BUFFERSIZE;
-	if(compress2(pCompressBuffer,&destLen,(Bytef *)data,length,1) != Z_OK) {
-		return 1;
-	}
-
-	_sendtoUncompressedTotal+=length;
-	_sendtoCompressedTotal+=destLen;
+	EncryptPacket(pPacketBuffer, (unsigned char*)data, &length);
 
 #endif
 
 	do
 	{
 #ifndef SAMPSRV
-		len = sendto( s, (char *)pCompressBuffer, destLen, 0, ( const sockaddr* ) & sa, sizeof( struct sockaddr_in ) );
+		len = sendto( s, (char *)pPacketBuffer, length, 0, ( const sockaddr* ) & sa, sizeof( struct sockaddr_in ) );
 #else
 		len = sendto( s, data, length, 0, ( const sockaddr* ) & sa, sizeof( struct sockaddr_in ) );
 #endif
