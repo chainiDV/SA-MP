@@ -63,7 +63,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>dxguid.lib;d3d9.lib;d3dx9.lib;User32.lib;comctl32.lib;advapi32.lib;kernel32.lib;gdi32.lib;odbc32.lib;odbccp32.lib;wsock32.lib;winmm.lib;wininet.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dxguid.lib;d3d9.lib;d3dx9.lib;User32.lib;comctl32.lib;advapi32.lib;kernel32.lib;gdi32.lib;odbc32.lib;odbccp32.lib;wsock32.lib;winmm.lib;wininet.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>d3d9;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -83,7 +83,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>dxguid.lib;d3d9.lib;d3dx9.lib;User32.lib;comctl32.lib;advapi32.lib;kernel32.lib;gdi32.lib;odbc32.lib;odbccp32.lib;wsock32.lib;winmm.lib;wininet.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dxguid.lib;d3d9.lib;d3dx9.lib;User32.lib;comctl32.lib;advapi32.lib;kernel32.lib;gdi32.lib;odbc32.lib;odbccp32.lib;wsock32.lib;winmm.lib;wininet.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>d3d9;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
     </Link>
