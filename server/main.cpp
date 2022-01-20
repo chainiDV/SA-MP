@@ -30,6 +30,7 @@ BOOL		bGameModeFinished=FALSE;
 
 unsigned int _uiRndSrvChallenge;
 
+int iPlayerTimeoutTime = 10000;
 #ifdef WIN32
 extern LONG WINAPI exc_handler(_EXCEPTION_POINTERS* exc_inf);
 #endif
@@ -123,6 +124,13 @@ void ServerInstagibChanged()
 	if (pNetGame) {
 		pNetGame->UpdateInstagib();
 	}
+}
+
+//----------------------------------------------------
+
+int GetPlayerTimeoutTime()
+{
+	return iPlayerTimeoutTime;
 }
 
 //----------------------------------------------------
@@ -317,6 +325,7 @@ int main (int argc, char** argv)
 	pConsole->AddStringVariable("filterscripts", 0, "");
 	pConsole->AddStringVariable("plugins", 0, "");
 	pConsole->AddStringVariable("nosign", 0, "");
+	pConsole->AddVariable("playertimeout", CON_VARTYPE_INT, 0, &iPlayerTimeoutTime);
 	pConsole->AddVariable("anticheat",CON_VARTYPE_BOOL, /* CON_VARFLAG_RULE */ 0, &bEnableAC);
 	pConsole->AddVariable("instagib", CON_VARTYPE_BOOL, CON_VARFLAG_RULE, &bEnableInstagib, ServerInstagibChanged);
 	pConsole->AddVariable("myriad", CON_VARTYPE_BOOL, 0, &bGameMod);

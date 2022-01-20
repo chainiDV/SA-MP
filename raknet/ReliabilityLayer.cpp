@@ -70,6 +70,9 @@ int SplitPacketIndexComp( SplitPacketIndexType const &key, InternalPacket* const
 	return 1;
 }
 
+#ifdef SAMPSRV
+int GetPlayerTimeoutTime();
+#endif
 
 //-------------------------------------------------------------------------------------------------------
 // Constructor
@@ -85,7 +88,11 @@ ReliabilityLayer::ReliabilityLayer() : updateBitStream( DEFAULT_MTU_SIZE )   // 
 	// Wait longer to disconnect in debug so I don't get disconnected while tracing
 	timeoutTime=20000;
 #else
+#ifdef SAMPSRV
+	timeoutTime=GetPlayerTimeoutTime();
+#else
 	timeoutTime=10000;
+#endif
 #endif
 
 #ifndef _RELEASE
