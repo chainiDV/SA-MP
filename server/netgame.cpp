@@ -94,7 +94,7 @@ CNetGame::CNetGame()
 	//m_pRak->InitializeSecurity(0, 0);
 	//m_pRak->SetTrackFrequencyTable(true);
 
-	if (!m_pRak->Start(dwMaxPlayers, 0, 10, dwPort, szBindAddress))
+	if (!m_pRak->Start(dwMaxPlayers, 0, iSleepTime, dwPort, szBindAddress))
 	{
 		if (szBindAddress)
 			logprintf("Unable to start server on %s:%d. Port in use?", 

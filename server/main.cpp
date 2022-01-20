@@ -31,6 +31,8 @@ BOOL		bGameModeFinished=FALSE;
 unsigned int _uiRndSrvChallenge;
 
 int iPlayerTimeoutTime = 10000;
+int iSleepTime = 5;
+
 #ifdef WIN32
 extern LONG WINAPI exc_handler(_EXCEPTION_POINTERS* exc_inf);
 #endif
@@ -301,6 +303,7 @@ int main (int argc, char** argv)
 
 	pConsole->AddVariable("lanmode",CON_VARTYPE_BOOL,0, &bLanModeEnable);
 	pConsole->AddVariable("query",CON_VARTYPE_BOOL, 0, &bAllowQuery);
+	pConsole->AddVariable("sleep",CON_VARTYPE_INT, 0, &iSleepTime);
 
 #ifdef RAKRCON
 	pConsole->AddVariable("rcon_port", CON_VARTYPE_INT, 0, &iRconPort);
@@ -416,7 +419,7 @@ int main (int argc, char** argv)
 			WaitForSingleObject(hConsoleExecuteEvent, INFINITE);
 		#endif
 
-		SLEEP(10);		
+		SLEEP(iSleepTime);
 	}
 
 #ifdef RAKRCON

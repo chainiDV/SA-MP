@@ -168,6 +168,8 @@ extern CRcon *pRcon;
 extern BYTE byteRconUser;
 extern BOOL bRconSocketReply;
 
+extern int iSleepTime;
+
 // -------------------
 // FUNCTION PROTOTYPES
 // -------------------
