@@ -4428,7 +4428,7 @@ bool RakPeer::RunUpdateCycle( void )
 			if (timeMS > remoteSystem->lastReliableSend && timeMS-remoteSystem->lastReliableSend > 5000 && remoteSystem->connectMode==RemoteSystemStruct::CONNECTED)
 			{
 				// If no reliable packets are waiting for an ack, do a one byte reliable send so that disconnections are noticed
-				rnss=remoteSystem->reliabilityLayer.GetStatistics();
+				rnss=remoteSystem->reliabilityLayer.GetStatistics( false );
 				if (rnss->messagesOnResendQueue==0)
 				{
 					unsigned char keepAlive=ID_DETECT_LOST_CONNECTIONS;

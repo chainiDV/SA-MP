@@ -2511,7 +2511,10 @@ RakNetStatisticsStruct * const ReliabilityLayer::GetStatistics( void )
 	statistics.bitsPerSecond = currentBandwidth;
 	//statistics.lossySize = lossyWindowSize == MAXIMUM_WINDOW_SIZE + 1 ? 0 : lossyWindowSize;
 //	statistics.lossySize=0;
-	statistics.messagesOnResendQueue = GetResendListDataSize();
+	if (bReset)
+		statistics.messagesOnResendQueue = 0;
+	else
+		statistics.messagesOnResendQueue = GetResendListDataSize();
 
 	return &statistics;
 }
