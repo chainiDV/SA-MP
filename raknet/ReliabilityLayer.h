@@ -315,6 +315,9 @@ private:
 	unsigned int blockWindowIncreaseUntilTime;
 	RakNetStatisticsStruct statistics;
 
+	// SA-MP
+	unsigned reliabilitySizeInBits; // Number of bits to write or read for reliability info
+
 	/// Memory-efficient receivedPackets algorithm:
 	/// receivedPacketsBaseIndex is the packet number we are expecting
 	/// Everything under receivedPacketsBaseIndex is a packet we already got

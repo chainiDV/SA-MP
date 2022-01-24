@@ -194,6 +194,7 @@ void ReliabilityLayer::InitializeVariables( void )
 	memset( waitingForSequencedPacketWriteIndex, 0, NUMBER_OF_ORDERED_STREAMS * sizeof(OrderingIndexType) );
 	memset( &statistics, 0, sizeof( statistics ) );
 	statistics.connectionStartTime = RakNet::GetTime();
+	reliabilitySizeInBits = 4;
 	splitPacketId = 0;
 	messageNumber = 0;
 	availableBandwidth=0;
@@ -1633,7 +1634,8 @@ int ReliabilityLayer::GetBitStreamHeaderLength( const InternalPacket *const inte
 
 	// Write the PacketReliability.  This is encoded in 3 bits
 	//bitStream->WriteBits((unsigned char*)&(internalPacket->reliability), 3, true);
-	bitLength += 3;
+	//bitLength += 3;
+	bitLength += reliabilitySizeInBits;
 
 	// If the reliability requires an ordering channel and ordering index, we Write those.
 	if ( internalPacket->reliability == UNRELIABLE_SEQUENCED || internalPacket->reliability == RELIABLE_SEQUENCED || internalPacket->reliability == RELIABLE_ORDERED )
@@ -1707,7 +1709,7 @@ int ReliabilityLayer::WriteToBitStreamFromInternalPacket( RakNet::BitStream *bit
 #endif
 
 	// Write the PacketReliability.  This is encoded in 3 bits
-	bitStream->WriteBits( (const unsigned char *)&c, 3, true );
+	bitStream->WriteBits( (const unsigned char *)&c, reliabilitySizeInBits, true );
 
 	// If the reliability requires an ordering channel and ordering index, we Write those.
 	if ( internalPacket->reliability == UNRELIABLE_SEQUENCED || internalPacket->reliability == RELIABLE_SEQUENCED || internalPacket->reliability == RELIABLE_ORDERED )
@@ -1799,7 +1801,7 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( RakNet::Bit
 	// Read the PacketReliability. This is encoded in 3 bits
 	unsigned char reliability;
 
-	bitStreamSucceeded = bitStream->ReadBits( ( unsigned char* ) ( &( reliability ) ), 3 );
+	bitStreamSucceeded = bitStream->ReadBits( ( unsigned char* ) ( &( reliability ) ), reliabilitySizeInBits);
 
 	internalPacket->reliability = ( const PacketReliability ) reliability;
 
@@ -1808,7 +1810,7 @@ InternalPacket* ReliabilityLayer::CreateInternalPacketFromBitStream( RakNet::Bit
 	// assert( bitStreamSucceeded );
 #endif
 
-	if ( bitStreamSucceeded == false )
+	if (reliability < UNRELIABLE || bitStreamSucceeded == false )
 	{
 		internalPacketPool.ReleasePointer( internalPacket );
 		return 0;
