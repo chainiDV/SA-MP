@@ -4968,7 +4968,7 @@ void* UpdateNetworkLoop( void* arguments )
 #endif
 
 	// 11/15/05 - this is slower than Sleep()
-#ifdef _WIN32
+/*#ifdef _WIN32
 #if (_WIN32_WINNT >= 0x0400) || (_WIN32_WINDOWS > 0x0400)
 	// Lets see if these timers give better performance than Sleep
 	HANDLE timerHandle;
@@ -4989,7 +4989,7 @@ void* UpdateNetworkLoop( void* arguments )
 	assert( success );
 
 #endif
-#endif
+#endif*/
 
 #ifdef _RAKNET_THREADSAFE
 	#pragma message("-- RakNet: _RAKNET_THREADSAFE defined.  Safe to use multiple threads on the same instance of RakPeer (Slow!). --")
