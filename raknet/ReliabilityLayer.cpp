@@ -2493,7 +2493,7 @@ void ReliabilityLayer::UpdateNextActionTime(void)
 //-------------------------------------------------------------------------------------------------------
 // Statistics
 //-------------------------------------------------------------------------------------------------------
-RakNetStatisticsStruct * const ReliabilityLayer::GetStatistics( void )
+RakNetStatisticsStruct * const ReliabilityLayer::GetStatistics( bool bReset )
 {
 	unsigned i;
 
