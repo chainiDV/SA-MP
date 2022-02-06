@@ -136,7 +136,9 @@ typedef struct _PED_TYPE
 	PADDING(_pad104,8); // 1140-1148
 	PED_TASKS_TYPE *Tasks; // 1148-1152
 	DWORD dwPlayerInfoOffset; // 1152-1156
-	PADDING(_pad200,144); // 1156-1300
+	PADDING(_pad200,124); // 1156-1280
+	DWORD dwActiveVision; // 1280-1284
+	PADDING(_pad133,16); // 1284-1300
 	float fAimZ; // 1300-1304
 	PADDING(_pad201,16); // 1304-1320
 	BYTE byteAimAnimState; // 1320-1321
