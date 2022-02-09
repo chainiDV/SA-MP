@@ -14,7 +14,7 @@ D3DXMATRIX matView, matProj;
 extern void d3d9DestroyDeviceObjects();
 extern void d3d9RestoreDeviceObjects();
 
-void GetScreenshotFileName(std::string& FileName);
+int GetScreenshotFileName(std::string& FileName);
 extern BOOL g_bTakeScreenshot;
 
 extern CNetGame *pNetGame;
@@ -131,6 +131,32 @@ void __stdcall RenderPlayerTags()
 
 //-------------------------------------------------
 
+void TakeScreenShot()
+{
+	g_bTakeScreenshot = FALSE;
+	std::string sFileName;
+	int iCount = GetScreenshotFileName(sFileName);
+
+	IDirect3DSurface9* pFrontBuffer;
+	pD3DDevice->CreateOffscreenPlainSurface(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), D3DFMT_A8R8G8B8, D3DPOOL_SCRATCH, &pFrontBuffer, NULL);
+	if(SUCCEEDED(pD3DDevice->GetFrontBufferData(0, pFrontBuffer)))
+	{
+		POINT point = {0, 0};
+		ClientToScreen(pGame->GetMainWindowHwnd(), &point);
+		RECT rect;
+		GetClientRect(pGame->GetMainWindowHwnd(), &rect);
+		rect.left += point.x; rect.right += point.x;
+		rect.top += point.y; rect.bottom += point.y;
+
+		D3DXSaveSurfaceToFile(sFileName.c_str(), D3DXIFF_PNG, pFrontBuffer, NULL, &rect);
+		pChatWindow->AddInfoMessage("Screenshot Taken - sa-mp-%03i.png",iCount);
+	} else {
+		pChatWindow->AddDebugMessage("Unable to save screenshot.");
+	}
+}
+
+//-------------------------------------------------
+
 HRESULT __stdcall IDirect3DDevice9Hook::Present(CONST RECT* pSourceRect, CONST RECT* pDestRect, HWND hDestWindowOverride, CONST RGNDATA* pDirtyRegion)
 {		
     // ---- Detection of fake d3d9.dll
@@ -149,26 +175,7 @@ HRESULT __stdcall IDirect3DDevice9Hook::Present(CONST RECT* pSourceRect, CONST R
 
 	if (g_bTakeScreenshot)
 	{
-		g_bTakeScreenshot = FALSE;
-		std::string sFileName;
-		GetScreenshotFileName(sFileName);
-	
-		IDirect3DSurface9* pFrontBuffer;
-		pD3DDevice->CreateOffscreenPlainSurface(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), D3DFMT_A8R8G8B8, D3DPOOL_SCRATCH, &pFrontBuffer, NULL);
-		if (SUCCEEDED(pD3DDevice->GetFrontBufferData(0, pFrontBuffer)))
-		{
-			POINT point = {0, 0};
-			ClientToScreen(pGame->GetMainWindowHwnd(), &point);
-			RECT rect;
-			GetClientRect(pGame->GetMainWindowHwnd(), &rect);
-			rect.left += point.x; rect.right += point.x;
-			rect.top += point.y; rect.bottom += point.y;
-
-			D3DXSaveSurfaceToFile(sFileName.c_str(), D3DXIFF_PNG, pFrontBuffer, NULL, &rect);
-			pChatWindow->AddInfoMessage("Screenshot Taken - %s",sFileName.c_str());
-		} else {
-			pChatWindow->AddDebugMessage("Unable to save screenshot.");
-		}
+		TakeScreenShot();
 	}
 
 	if(!pGame->IsMenuActive())

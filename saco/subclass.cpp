@@ -23,7 +23,7 @@ extern CDXUTDialog		*pGameUI;
 BOOL g_bTakeScreenshot = FALSE;
 WNDPROC hOldProc;
 LRESULT APIENTRY NewWndProc(HWND,UINT,WPARAM,LPARAM);
-void GetScreenshotFileName(std::string& FileName);
+int GetScreenshotFileName(std::string& FileName);
 extern GAME_SETTINGS tSettings;
 
 //----------------------------------------------------
@@ -277,19 +277,17 @@ LRESULT APIENTRY NewWndProc( HWND hwnd,UINT uMsg,
 
 //----------------------------------------------------
 
-void GetScreenshotFileName(std::string & FileName)
+int GetScreenshotFileName(std::string & FileName)
 {
-	std::string ModuleFileName;
-    ModuleFileName.reserve(MAX_PATH);
-    GetModuleFileName(NULL,(char *)(ModuleFileName.data()),MAX_PATH);
-    FileName = ModuleFileName.substr(0, ModuleFileName.find_last_of(":\\"));
+	FileName = GetWorkingPath();
 
-    char Buf[MAX_PATH];
+	char Buf[MAX_PATH]={0};
     WIN32_FIND_DATA ffd;
     HANDLE h;
-    for (int i = 0; i < 1000; i++)
+	int i;
+    for (i = 0; i < 1000; i++)
     {
-        wsprintf(Buf, (FileName + "sa-mp-%03i.png").c_str(), i);
+        sprintf(Buf, (FileName + "\\screens\\sa-mp-%03i.png").c_str(), i);
         h = FindFirstFile(Buf, &ffd);
         if(h != INVALID_HANDLE_VALUE) {   
 			FindClose(h);
@@ -299,6 +297,7 @@ void GetScreenshotFileName(std::string & FileName)
 		}
     }
     FileName = Buf;
+	return i;
 }
 
 //----------------------------------------------------
