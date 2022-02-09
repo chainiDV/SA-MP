@@ -14,6 +14,9 @@
 
 extern CGame			*pGame;
 
+CHAR szWorkingPath[MAX_PATH+1];
+CHAR szCachePath[MAX_PATH+1];
+
 int						iGtaVersion=0;
 
 GAME_SETTINGS			tSettings;
@@ -161,6 +164,74 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 //----------------------------------------------------
 
+PCHAR GetWorkingPath()
+{
+	return szWorkingPath;
+}
+
+//----------------------------------------------------
+
+PCHAR GetCachePath()
+{
+	return szCachePath;
+}
+
+//----------------------------------------------------
+
+void SetupCacheDirectory()
+{
+	memset(szCachePath, 0, sizeof(szCachePath));
+
+	CHAR szBuffer[MAX_PATH+1];
+	memset(szBuffer, 0, sizeof(szBuffer));
+
+	DWORD dwBufLen = MAX_PATH;
+	DWORD dwType;
+	HKEY hKey;
+
+	sprintf(szCachePath, "%s\\cache", szWorkingPath);
+
+	if(RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\SAMP", 0, KEY_READ, &hKey) == ERROR_SUCCESS &&
+		RegQueryValueEx(hKey, "model_cache", NULL, &dwType, (LPBYTE)szBuffer, &dwBufLen) == ERROR_SUCCESS)
+	{
+		strncpy(szCachePath, szBuffer, sizeof(szCachePath));
+	}
+
+	if(!IsDirectoryExist(szCachePath))
+		CreateDirectory(szCachePath, NULL);
+
+	CHAR szLocalPath[MAX_PATH+1];
+	sprintf(szLocalPath, "%s\\local", szCachePath);
+	if(!IsDirectoryExist(szLocalPath))
+		CreateDirectory(szLocalPath, NULL);
+}
+
+//----------------------------------------------------
+
+void SetupWorkingDirectory()
+{
+	memset(szWorkingPath, 0, sizeof(szWorkingPath));
+
+	if(strlen((char*)0xC92368) == 0)
+	{
+		GetCurrentDirectory(sizeof(szWorkingPath), szWorkingPath);
+		return;
+	}
+
+	sprintf(szWorkingPath, "%s\\SAMP", (char*)0xC92368);
+	if(!IsDirectoryExist(szWorkingPath))
+		CreateDirectory(szWorkingPath, NULL);
+
+	CHAR szScreensPath[MAX_PATH+1];
+	sprintf(szScreensPath, "%s\\screens", szWorkingPath);
+	if(!IsDirectoryExist(szScreensPath))
+		CreateDirectory(szScreensPath, NULL);
+
+	SetupCacheDirectory();
+}
+
+//----------------------------------------------------
+
 DWORD dwFogEnabled = 0;
 DWORD dwFogColor = 0x00FF00FF;
 BOOL gDisableAllFog = FALSE;
@@ -273,6 +344,8 @@ void DoInitStuff()
 	if(!bGameInited)
 	{	
 		OutputDebugString("Start of DoInitStuff()");
+
+		SetupWorkingDirectory();
 
 		timeBeginPeriod(5); // increases the accuracy of Sleep()
 		SubclassGameWindow();

@@ -56,6 +56,8 @@ float DegToRad(float fDegrees);
 
 bool IsNumeric(char *szString);
 
+BOOL IsDirectoryExist(char * szFileName);
+
 void GameForcedExit(int iReasonCode);
 
 BOOL __stdcall IsValidModel(int iModelID);

@@ -724,6 +724,14 @@ bool IsNumeric(char * szString)
 }
 
 //-----------------------------------------------------------
+
+BOOL IsDirectoryExist(char * szFileName)
+{
+	struct stat buf;
+	return stat(szFileName, &buf) == 0;
+}
+
+//-----------------------------------------------------------
 // Check if a specific model ID is valid
 
 BOOL __stdcall IsValidModel(int iModelID)

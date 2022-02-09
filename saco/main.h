@@ -86,6 +86,8 @@ typedef struct _GAME_SETTINGS {
 #include "game/scripting.h"
 #include "d3dhook/IDirect3DDevice9Hook.h"
 
+PCHAR GetWorkingPath();
+PCHAR GetCachePath();
 
 void SetStringFromCommandLine(char *szCmdLine, char *szString);
 void InitSettings();
