@@ -602,6 +602,9 @@
     <ClInclude Include="..\raknet\PacketCipher.h">
       <Filter>raknet</Filter>
     </ClInclude>
+    <ClInclude Include="config.h">
+      <Filter>general</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="archive\ArchiveFS.cpp">
@@ -997,6 +1000,9 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="..\raknet\PacketCipher.cpp">
       <Filter>raknet</Filter>
+    </ClCompile>
+    <ClCompile Include="config.cpp">
+      <Filter>general</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

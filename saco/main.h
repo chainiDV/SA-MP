@@ -69,6 +69,7 @@ typedef struct _GAME_SETTINGS {
 #include "net/netgame.h"
 #include "net/scriptrpc.h"
 
+#include "config.h"
 #include "filehooks.h"
 #include "fontrender.h"
 #include "chatwindow.h"
